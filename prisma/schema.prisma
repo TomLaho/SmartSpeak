@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String      @id @default(cuid())
+  email      String      @unique
+  password   String
+  name       String?
+  createdAt  DateTime    @default(now())
+  recordings Recording[]
+}
+
+model Recording {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  title        String
+  originalUrl  String
+  audioUrl     String
+  durationSec  Int
+  transcript   String
+  language     String    @default("en")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  metrics      Metrics?
+  tips         Tip[]
+}
+
+model Metrics {
+  id           String    @id @default(cuid())
+  recordingId  String    @unique
+  recording    Recording @relation(fields: [recordingId], references: [id])
+  wpm          Int
+  wpmStdDev    Float
+  fillerCount  Int
+  fillerRate   Float
+  avgPauseMs   Int
+  clarityScore Float
+  readability  Float
+  fillersJson  Json
+  pausesJson   Json
+  createdAt    DateTime  @default(now())
+}
+
+model Tip {
+  id          String    @id @default(cuid())
+  recordingId String
+  recording   Recording @relation(fields: [recordingId], references: [id])
+  category    String
+  text        String
+  priority    Int
+  createdAt   DateTime  @default(now())
+}
+
+model ShareToken {
+  id          String   @id @default(cuid())
+  recordingId String   @unique
+  token       String   @unique
+  createdAt   DateTime @default(now())
+  recording   Recording @relation(fields: [recordingId], references: [id])
+}
