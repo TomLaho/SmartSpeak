@@ -17,12 +17,14 @@ This repository contains the initial scaffolding for the SmartSpeak application.
 
 ## Setup
 
-Install dependencies for each workspace.
+Install dependencies for each workspace before running any scripts.
 
 ```bash
+# Frontend dependencies
 cd frontend
 npm install
 
+# Backend dependencies
 cd ../backend
 npm install
 ```
@@ -54,7 +56,7 @@ npm run start
 # Backend
 cd backend
 npm run build
-node dist/index.js
+npm run start
 ```
 
 ## Environment Variables
@@ -67,3 +69,17 @@ PORT=5000
 ```
 
 Refer to the framework documentation for more configuration options.
+
+## Testing
+
+Use the available npm scripts within each workspace to validate the project locally.
+
+```bash
+# Frontend
+cd frontend
+npm run lint
+
+# Backend
+cd ../backend
+npm run build
+```
