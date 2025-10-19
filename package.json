@@ -9,7 +9,5 @@
     "build": "npm -w frontend run build && npm -w backend run build",
     "lint": "npm -w frontend run lint || true"
   },
-  "devDependencies": {
-    "concurrently": "^9.0.0"
-  }
+  "devDependencies": { "concurrently": "^9.0.0" }
 }
