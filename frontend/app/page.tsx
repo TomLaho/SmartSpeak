@@ -14,11 +14,12 @@ export default function HomePage() {
           Build conversational experiences faster.
         </h1>
         <p className="text-lg text-muted-foreground sm:max-w-2xl">
-          This scaffold ships with Next.js 14, Tailwind CSS, and shadcn/ui so you can focus on
-          crafting delightful voice-enabled interfaces.
+          This scaffold ships with Next.js 14, Tailwind CSS, and shadcn/ui so you can focus on crafting delightful voice-enabled
+          interfaces.
         </p>
       </div>
       <div className="flex flex-wrap gap-3">
+        <Button>Get started</Button>
         <Button asChild>
           <Link href="https://nextjs.org/docs">Read the docs</Link>
         </Button>
