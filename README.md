@@ -17,58 +17,36 @@ This repository contains the initial scaffolding for the SmartSpeak application.
 
 ## Setup
 
-Install dependencies for each workspace before running any scripts.
+Install dependencies once from the repository root to pull in all workspace packages (frontend, backend, and shared dev tooling).
 
 ```bash
-# Frontend dependencies
-cd frontend
-npm install
-
-# Backend dependencies
-cd ../backend
 npm install
 ```
 
 ## Development
 
-Run the frontend and backend in separate terminals.
+Run both the Next.js frontend and Express backend together with a single command from the repository root.
 
 ```bash
-# Frontend
-cd frontend
-npm run dev
-
-# Backend
-cd backend
 npm run dev
 ```
 
-The frontend dev server defaults to [http://localhost:3000](http://localhost:3000) and the backend API to [http://localhost:5000](http://localhost:5000).
+This starts the frontend on [http://localhost:3000](http://localhost:3000) and the backend API on [http://localhost:5001](http://localhost:5001). The frontend automatically proxies `/api/*` requests to the backend, so API calls can be made with relative paths like `fetch("/api/health")` without running into CORS issues during development.
 
 ## Production Builds
 
 ```bash
-# Frontend
+# Build both workspaces
+npm run build
+
+# Start frontend
 cd frontend
-npm run build
 npm run start
 
-# Backend
-cd backend
-npm run build
+# Start backend (after building)
+cd ../backend
 npm run start
 ```
-
-## Environment Variables
-
-Create `.env` files in `frontend/` and `backend/` as needed. Environment examples:
-
-```bash
-# backend/.env
-PORT=5000
-```
-
-Refer to the framework documentation for more configuration options.
 
 ## Testing
 
@@ -76,10 +54,24 @@ Use the available npm scripts within each workspace to validate the project loca
 
 ```bash
 # Frontend
-cd frontend
 npm run lint
 
 # Backend
-cd ../backend
-npm run build
+npm --workspace backend run build
 ```
+
+## Environment Variables
+
+- `frontend/.env.local`
+
+  ```bash
+  NEXT_PUBLIC_API_URL=http://localhost:5001
+  ```
+
+- `backend/.env`
+
+  ```bash
+  PORT=5001
+  ```
+
+Adjust the values as needed for your local setup.
