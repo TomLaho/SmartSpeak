@@ -1,9 +1,11 @@
 import Link from "next/link";
+import BackendStatus from "@/app/_components/BackendStatus";
 import { Button } from "@/components/ui/button";
 
 export default function HomePage() {
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-16">
+      <BackendStatus />
       <div className="space-y-4">
         <span className="rounded-full border border-border bg-muted/60 px-4 py-1 text-xs uppercase tracking-wide text-muted-foreground">
           Welcome to SmartSpeak
