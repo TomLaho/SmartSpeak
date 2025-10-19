@@ -1,7 +1,10 @@
 {
   "name": "smartspeak",
   "private": true,
-  "workspaces": ["frontend", "backend"],
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
   "scripts": {
     "dev": "concurrently -n FRONTEND,BACKEND -c green,blue \"npm:dev:frontend\" \"npm:dev:backend\"",
     "dev:frontend": "npm --workspace frontend run dev",
@@ -9,5 +12,7 @@
     "build": "npm -w frontend run build && npm -w backend run build",
     "lint": "npm -w frontend run lint || true"
   },
-  "devDependencies": { "concurrently": "^9.0.0" }
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
 }
