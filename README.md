@@ -15,7 +15,7 @@ This repository contains the initial scaffolding for the SmartSpeak application.
 └── frontend/  # Next.js 14 App Router client
 ```
 
-## Setup
+## Quickstart
 
 Install dependencies once from the repository root to pull in all workspace packages (frontend, backend, and shared dev tooling).
 
@@ -23,15 +23,16 @@ Install dependencies once from the repository root to pull in all workspace pack
 npm install
 ```
 
-## Development
-
-Run both the Next.js frontend and Express backend together with a single command from the repository root.
+Then start both the frontend and backend with a single command:
 
 ```bash
 npm run dev
 ```
 
-This starts the frontend on [http://localhost:3000](http://localhost:3000) and the backend API on [http://localhost:5001](http://localhost:5001). The frontend automatically proxies `/api/*` requests to the backend, so API calls can be made with relative paths like `fetch("/api/health")` without running into CORS issues during development.
+- Frontend: [http://localhost:3000](http://localhost:3000)
+- Backend API: [http://localhost:5000](http://localhost:5000)
+
+The frontend automatically proxies `/api/*` requests to the backend, so API calls can be made with relative paths like `fetch("/api/health")` without running into CORS issues during development.
 
 ## Production Builds
 
@@ -65,13 +66,13 @@ npm --workspace backend run build
 - `frontend/.env.local`
 
   ```bash
-  NEXT_PUBLIC_API_URL=http://localhost:5001
+  NEXT_PUBLIC_API_URL=http://localhost:5000
   ```
 
-- `backend/.env`
+- `backend/.env` *(optional)*
 
   ```bash
-  PORT=5001
+  PORT=5000
   ```
 
 Adjust the values as needed for your local setup.
