@@ -12,6 +12,11 @@ const buttonVariants = cva(
         outline: "border border-gray-300 bg-white hover:bg-gray-50",
         ghost: "hover:bg-gray-100",
         link: "underline underline-offset-4"
+        secondary: "bg-muted text-foreground hover:bg-muted/80",
+        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        outline: "border border-gray-300 bg-white hover:bg-gray-50",
+        ghost: "hover:bg-gray-100",
+        link: "underline underline-offset-4",
       },
       size: {
         default: "h-10 px-4",
@@ -19,6 +24,12 @@ const buttonVariants = cva(
         lg: "h-11 px-8",
         icon: "h-10 w-10"
       }
+        icon: "h-10 w-10",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
     },
     defaultVariants: { variant: "default", size: "default" }
   }

@@ -2,6 +2,10 @@
   "name": "smartspeak",
   "private": true,
   "workspaces": ["frontend", "backend"],
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
   "scripts": {
     "dev": "concurrently -n FRONTEND,BACKEND -c green,blue \"npm:dev:frontend\" \"npm:dev:backend\"",
     "dev:frontend": "npm --workspace frontend run dev",

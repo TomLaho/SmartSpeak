@@ -5,17 +5,37 @@
 :root {
   --background: 0 0% 100%;
   --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
   --muted: 210 40% 96.1%;
   --muted-foreground: 215.4 16.3% 46.9%;
   --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --primary: 222.2 47.4% 11.2%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 210 40% 98%;
+  --ring: 215 20.2% 65.1%;
 }
 
 .dark {
   --background: 222.2 84% 4.9%;
   --foreground: 210 40% 98%;
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
   --muted: 217.2 32.6% 17.5%;
   --muted-foreground: 215 20.2% 65.1%;
   --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --primary: 210 40% 98%;
+  --primary-foreground: 222.2 84% 4.9%;
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --ring: 215 20.2% 65.1%;
 }
 
 body {
@@ -23,16 +43,36 @@ body {
   color: hsl(var(--foreground));
 }
 
+.bg-card {
+  background-color: hsl(var(--card));
+}
+
+.text-card-foreground {
+  color: hsl(var(--card-foreground));
+}
+
 .border-border {
   border-color: hsl(var(--border));
+}
+
+.border-input {
+  border-color: hsl(var(--input));
 }
 
 .bg-background {
   background-color: hsl(var(--background));
 }
 
+.bg-card {
+  background-color: hsl(var(--card));
+}
+
 .bg-muted\/40 {
   background-color: hsla(var(--muted), 0.4);
+}
+
+.bg-muted\/30 {
+  background-color: hsla(var(--muted), 0.3);
 }
 
 .text-muted-foreground {
@@ -41,4 +81,40 @@ body {
 
 .text-foreground {
   color: hsl(var(--foreground));
+}
+
+.bg-secondary {
+  background-color: hsl(var(--secondary));
+}
+
+.text-secondary-foreground {
+  color: hsl(var(--secondary-foreground));
+}
+
+.bg-muted {
+  background-color: hsl(var(--muted));
+}
+
+.bg-primary\/10 {
+  background-color: hsla(var(--primary), 0.1);
+}
+
+.text-primary {
+  color: hsl(var(--primary));
+}
+
+.bg-destructive {
+  background-color: hsl(var(--destructive));
+}
+
+.text-destructive {
+  color: hsl(var(--destructive));
+}
+
+.text-destructive-foreground {
+  color: hsl(var(--destructive-foreground));
+}
+
+.border-destructive\/50 {
+  border-color: hsla(var(--destructive), 0.5);
 }
