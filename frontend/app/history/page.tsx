@@ -1,13 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import type { CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowLeft, History, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { fetchHistory } from "@/lib/api";
 import { useLocalUser } from "@/lib/hooks/useLocalUser";
 import type { HistoryEntry } from "@/types/api";
+import { cn } from "@/lib/utils";
 
 export default function HistoryPage() {
   const { userId } = useLocalUser();
@@ -15,62 +20,117 @@ export default function HistoryPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadHistory = useCallback(async () => {
     if (!userId) return;
-    let active = true;
     setIsLoading(true);
     setError(null);
-    fetchHistory(userId)
-      .then((data) => {
-        if (!active) return;
-        setItems(data);
-      })
-      .catch(() => {
-        if (!active) return;
-        setError("We couldn't load your history. Try again later.");
-      })
-      .finally(() => {
-        if (!active) return;
-        setIsLoading(false);
-      });
-    return () => {
-      active = false;
-    };
+    try {
+      const data = await fetchHistory(userId);
+      setItems(data);
+    } catch (err) {
+      console.error("Failed to fetch history", err);
+      setError(
+        "We couldn't load your previous sessions. Check your connection and try again in a moment.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
   }, [userId]);
 
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
+
+  const fillerTotals = useMemo(() => {
+    return items.map((item) =>
+      Object.values(item.metrics.fillerWordCounts).reduce((total, count) => total + count, 0),
+    );
+  }, [items]);
+
   return (
-    <section className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-12">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Speech history</h1>
-        <p className="text-muted-foreground">Review past coaching sessions and track your progress over time.</p>
+    <section className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-16">
+      <div className="space-y-4 animate-fade-up" style={{ "--fade-delay": "0s" } as CSSProperties}>
+        <span className="inline-flex w-fit items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+          <History className="h-3.5 w-3.5" aria-hidden /> Progress tracker
+        </span>
+        <div className="space-y-3">
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Speech history</h1>
+          <p className="max-w-3xl text-muted-foreground">
+            Review past coaching sessions, compare key delivery metrics, and spot trends in your speaking performance over time.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button asChild variant="ghost" className="gap-2">
+            <Link href="/">
+              <ArrowLeft className="h-4 w-4" aria-hidden /> Back to dashboard
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {!userId ? (
-        <Card>
+        <Card className="border-none bg-card/80 shadow-elevated backdrop-blur">
           <CardHeader>
-            <CardTitle>Sign in to see history</CardTitle>
-            <CardDescription>Add your user id or email from the header to save and retrieve sessions.</CardDescription>
-          </CardHeader>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>Your recent analyses</CardTitle>
+            <CardTitle>Save your progress</CardTitle>
             <CardDescription>
-              {isLoading ? "Fetching data…" : `You have ${items.length} recorded session${items.length === 1 ? "" : "s"}.`}
+              Add your email or user ID in the header to store new analyses and build a personalised progress timeline.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
-            {!error && items.length === 0 && !isLoading && (
-              <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">
-                <p>No analyses yet.</p>
-                <Button asChild variant="secondary">
-                  <Link href="/">Run your first analysis</Link>
-                </Button>
+            <Button asChild className="gap-2">
+              <Link href="/">
+                <Sparkles className="h-4 w-4" aria-hidden /> Run an analysis to get started
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="border-none bg-card/85 shadow-elevated backdrop-blur">
+          <CardHeader className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <CardTitle>Your recent analyses</CardTitle>
+              <CardDescription>
+                {isLoading
+                  ? "Fetching your sessions…"
+                  : items.length === 0
+                    ? "No recorded sessions yet. Run an analysis to populate this view."
+                    : "These sessions are stored locally for quick reference."
+                }
+              </CardDescription>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="text-xs font-medium">
+                {items.length} session{items.length === 1 ? "" : "s"}
+              </Badge>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => void loadHistory()}
+                className="gap-2"
+              >
+                <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin") } aria-hidden /> Refresh
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {error && (
+              <div className="mb-4 rounded-2xl border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+                {error}
               </div>
             )}
-            {!error && items.length > 0 && (
+            {isLoading ? (
+              <HistorySkeleton />
+            ) : items.length === 0 ? (
+              <div className="flex flex-col gap-3 rounded-2xl border border-dashed border-border/70 bg-muted/20 p-6 text-sm text-muted-foreground">
+                <p>No analyses yet. New sessions appear here automatically.</p>
+                <Button asChild variant="secondary" className="w-fit gap-2">
+                  <Link href="/">
+                    <Sparkles className="h-4 w-4" aria-hidden /> Run your first analysis
+                  </Link>
+                </Button>
+              </div>
+            ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -78,19 +138,17 @@ export default function HistoryPage() {
                     <TableHead>Words per minute</TableHead>
                     <TableHead>Clarity</TableHead>
                     <TableHead>Energy</TableHead>
-                    <TableHead>Filler words</TableHead>
+                    <TableHead className="text-right">Filler words</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {items.map((item) => (
-                    <TableRow key={item.id}>
+                  {items.map((item, index) => (
+                    <TableRow key={item.id} className="transition hover:bg-muted/40">
                       <TableCell>{new Date(item.createdAt).toLocaleString()}</TableCell>
                       <TableCell>{item.metrics.wordsPerMinute}</TableCell>
                       <TableCell>{Math.round(item.metrics.clarity * 100)}%</TableCell>
                       <TableCell className="capitalize">{item.metrics.energy}</TableCell>
-                      <TableCell>
-                        {Object.values(item.metrics.fillerWordCounts).reduce((total, count) => total + count, 0)}
-                      </TableCell>
+                      <TableCell className="text-right">{fillerTotals[index]}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -100,5 +158,21 @@ export default function HistoryPage() {
         </Card>
       )}
     </section>
+  );
+}
+
+function HistorySkeleton() {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={`history-skeleton-${index}`} className="grid grid-cols-5 gap-4">
+          <Skeleton className="h-6 w-full rounded-full" />
+          <Skeleton className="h-6 w-full rounded-full" />
+          <Skeleton className="h-6 w-full rounded-full" />
+          <Skeleton className="h-6 w-full rounded-full" />
+          <Skeleton className="h-6 w-full rounded-full" />
+        </div>
+      ))}
+    </div>
   );
 }

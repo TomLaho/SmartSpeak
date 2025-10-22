@@ -3,43 +3,59 @@
 @tailwind utilities;
 
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
+  --background: 249 69% 97%;
+  --foreground: 230 41% 12%;
   --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --primary: 222.2 47.4% 11.2%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222.2 47.4% 11.2%;
-  --destructive: 0 72% 51%;
-  --destructive-foreground: 210 40% 98%;
-  --ring: 215 20.2% 65.1%;
+  --card-foreground: 230 41% 12%;
+  --muted: 256 48% 94%;
+  --muted-foreground: 249 27% 40%;
+  --border: 256 40% 88%;
+  --input: 252 43% 88%;
+  --primary: 262 83% 61%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 248 60% 92%;
+  --secondary-foreground: 248 33% 32%;
+  --accent: 281 89% 68%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 2 88% 64%;
+  --destructive-foreground: 0 0% 100%;
+  --ring: 262 78% 72%;
+  --shadow-soft: 262 52% 75% / 0.3;
 }
 
 .dark {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-  --card: 222.2 84% 4.9%;
-  --card-foreground: 210 40% 98%;
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  --primary: 210 40% 98%;
-  --primary-foreground: 222.2 84% 4.9%;
-  --secondary: 217.2 32.6% 17.5%;
-  --secondary-foreground: 210 40% 98%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 210 40% 98%;
-  --ring: 215 20.2% 65.1%;
+  --background: 238 34% 9%;
+  --foreground: 0 0% 100%;
+  --card: 240 31% 13%;
+  --card-foreground: 0 0% 100%;
+  --muted: 238 35% 16%;
+  --muted-foreground: 240 12% 70%;
+  --border: 239 29% 22%;
+  --input: 239 29% 22%;
+  --primary: 263 89% 74%;
+  --primary-foreground: 238 34% 9%;
+  --secondary: 244 32% 19%;
+  --secondary-foreground: 0 0% 100%;
+  --accent: 281 82% 66%;
+  --accent-foreground: 238 34% 9%;
+  --destructive: 359 72% 59%;
+  --destructive-foreground: 0 0% 100%;
+  --ring: 261 74% 68%;
+  --shadow-soft: 258 45% 40% / 0.25;
 }
 
 body {
-  background-color: hsl(var(--background));
+  min-height: 100vh;
+  background: radial-gradient(circle at 20% 20%, hsla(var(--accent), 0.18), transparent 55%),
+    radial-gradient(circle at 80% 10%, hsla(var(--primary), 0.22), transparent 55%),
+    radial-gradient(circle at 50% 80%, hsla(var(--muted), 0.45), transparent 65%),
+    linear-gradient(180deg, hsl(var(--background)), hsl(var(--background)) 60%, hsl(var(--muted)) 100%);
+  color: hsl(var(--foreground));
+  background-attachment: fixed;
+}
+
+::selection {
+  background-color: hsla(var(--primary), 0.2);
   color: hsl(var(--foreground));
 }
 
@@ -61,10 +77,6 @@ body {
 
 .bg-background {
   background-color: hsl(var(--background));
-}
-
-.bg-card {
-  background-color: hsl(var(--card));
 }
 
 .bg-muted\/40 {
@@ -117,4 +129,64 @@ body {
 
 .border-destructive\/50 {
   border-color: hsla(var(--destructive), 0.5);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.4);
+    opacity: 0.6;
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.6s ease var(--fade-delay, 0s) both;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2.4s ease-in-out infinite;
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-image: linear-gradient(90deg, hsla(var(--muted), 0.4) 0%, hsla(var(--muted), 0.6) 50%, hsla(var(--muted), 0.4) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
 }

@@ -6,12 +6,18 @@ const fillerWords = ["um", "uh", "like", "you know", "actually", "basically"];
 const openaiApiKey = process.env.OPENAI_API_KEY;
 const openaiClient = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : null;
 
+/**
+ * Roughly estimates the words per minute based on transcript length.
+ */
 function calculateWordsPerMinute(transcript: string): number {
   const words = transcript.trim().split(/\s+/).filter(Boolean).length;
   const assumedDurationMinutes = Math.max(1, transcript.length / 750); // heuristic
   return Math.round(words / assumedDurationMinutes);
 }
 
+/**
+ * Counts common filler words in the transcript, normalising spacing.
+ */
 function calculateFillerCounts(transcript: string): Record<string, number> {
   const lowerTranscript = transcript.toLowerCase();
   const counts: Record<string, number> = {};
@@ -23,6 +29,9 @@ function calculateFillerCounts(transcript: string): Record<string, number> {
   return counts;
 }
 
+/**
+ * Generates deterministic fallback metrics when OpenAI is unavailable.
+ */
 function buildFallbackAnalysis(transcript: string): AnalysisResponse {
   const fillerCounts = calculateFillerCounts(transcript);
   const fillerTotal = Object.values(fillerCounts).reduce((acc, val) => acc + val, 0);
@@ -53,6 +62,9 @@ function buildFallbackAnalysis(transcript: string): AnalysisResponse {
   return { transcript, metrics, suggestions };
 }
 
+/**
+ * Analyses a transcript using OpenAI when available, or the fallback model otherwise.
+ */
 export async function analyzeTranscript(transcript: string): Promise<AnalysisResponse> {
   if (!transcript.trim()) {
     throw new Error("Transcript must not be empty");
@@ -96,6 +108,9 @@ export function getFallbackAnalysis(transcript: string): AnalysisResponse {
   return buildFallbackAnalysis(transcript);
 }
 
+/**
+ * Returns the filler word counts for a transcript.
+ */
 export function getFillerCounts(transcript: string): Record<string, number> {
   return calculateFillerCounts(transcript);
 }

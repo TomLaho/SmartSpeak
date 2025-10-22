@@ -21,8 +21,8 @@ analyzeRouter.post("/analyze", async (req, res) => {
           data: {
             userId,
             transcript,
-            metrics: analysis.metrics,
-            suggestions: analysis.suggestions,
+            metrics: JSON.stringify(analysis.metrics),
+            suggestions: JSON.stringify(analysis.suggestions),
           },
         });
         recordId = record.id;

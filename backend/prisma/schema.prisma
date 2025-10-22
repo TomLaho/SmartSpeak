@@ -11,7 +11,7 @@ model Analysis {
   id          String   @id @default(cuid())
   userId      String
   transcript  String
-  metrics     Json
-  suggestions Json
+  metrics     String
+  suggestions String
   createdAt   DateTime @default(now())
 }
