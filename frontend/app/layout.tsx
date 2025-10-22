@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Inter } from "next/font/google";
 import type { ReactNode } from "react";
+import { ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import "./globals.css";
 import { UserSwitcher } from "./_components/UserSwitcher";
@@ -20,31 +21,54 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} bg-background font-sans text-foreground antialiased`}>
-        <div className="flex min-h-screen flex-col">
-          <header className="border-b border-border bg-muted/40">
-            <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-4">
-              <Link href="/" className="flex items-center gap-2 text-lg font-semibold">
-                SmartSpeak
+      <body className={`${inter.variable} bg-background/80 font-sans text-foreground antialiased`}>
+        <div className="relative flex min-h-screen flex-col">
+          <div className="pointer-events-none absolute inset-0 -z-10 bg-hero-grid opacity-70" aria-hidden />
+          <header className="sticky top-0 z-40 border-b border-border/60 bg-background/70 backdrop-blur-xl">
+            <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-5">
+              <Link href="/" className="group flex items-center gap-2 text-xl font-semibold tracking-tight">
+                <span className="rounded-full bg-gradient-to-r from-primary to-accent p-2 text-background shadow-glow transition-transform group-hover:scale-105">
+                  SS
+                </span>
+                <div className="flex flex-col">
+                  <span className="bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
+                    SmartSpeak
+                  </span>
+                  <span className="text-xs font-normal text-muted-foreground">AI-powered speaking coach</span>
+                </div>
               </Link>
               <div className="flex items-center gap-3">
-                <Button asChild variant="ghost" size="sm" className="md:hidden">
+                <nav className="hidden items-center gap-3 text-sm font-medium text-muted-foreground md:flex">
+                  <Link href="/" className="transition hover:text-foreground">Product</Link>
+                  <Link href="/history" className="transition hover:text-foreground">History</Link>
+                </nav>
+                <Button asChild size="sm" variant="ghost" className="md:hidden">
                   <Link href="/history">History</Link>
+                </Button>
+                <Button asChild variant="outline" className="hidden items-center gap-1 text-sm font-medium md:flex">
+                  <Link href="https://github.com/" target="_blank" rel="noreferrer">
+                    GitHub <ArrowUpRight className="h-4 w-4" aria-hidden />
+                  </Link>
                 </Button>
                 <UserSwitcher />
               </div>
             </div>
           </header>
-          <main className="flex-1 bg-gradient-to-b from-background via-background to-muted/20">{children}</main>
-          <footer className="border-t border-border bg-muted/40">
-            <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 px-6 py-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-              <p>© {new Date().getFullYear()} SmartSpeak. Level up your speaking confidence.</p>
-              <div className="flex gap-4">
-                <Link href="https://nextjs.org" className="hover:text-foreground">
-                  Next.js
+          <main className="relative flex-1">{children}</main>
+          <footer className="border-t border-border/60 bg-background/70 backdrop-blur-xl">
+            <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+              <p className="max-w-xl">
+                © {new Date().getFullYear()} SmartSpeak. Crafted to help you present with clarity, confidence, and charisma.
+              </p>
+              <div className="flex flex-wrap items-center gap-4 text-xs uppercase tracking-wide">
+                <Link href="https://nextjs.org" className="transition hover:text-foreground">
+                  Built with Next.js
                 </Link>
-                <Link href="https://ui.shadcn.com" className="hover:text-foreground">
-                  shadcn/ui
+                <Link href="https://ui.shadcn.com" className="transition hover:text-foreground">
+                  UI components by shadcn/ui
+                </Link>
+                <Link href="https://openai.com" className="transition hover:text-foreground">
+                  Powered by OpenAI
                 </Link>
               </div>
             </div>

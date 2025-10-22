@@ -9,6 +9,10 @@ function resolveUrl(path: string) {
   return path;
 }
 
+/**
+ * Uploads an audio/video file so the backend can generate a transcript.
+ * @throws {Error} when the server responds with a non-2xx status code.
+ */
 export async function uploadSpeechFile(file: File): Promise<UploadAudioResponse> {
   const formData = new FormData();
   formData.append("file", file);
@@ -19,12 +23,16 @@ export async function uploadSpeechFile(file: File): Promise<UploadAudioResponse>
   });
 
   if (!response.ok) {
-    throw new Error("Upload failed");
+    const detail = await safeParseError(response);
+    throw new Error(detail ?? "Upload failed. Try a smaller file or convert it to MP3/WAV.");
   }
 
   return (await response.json()) as UploadAudioResponse;
 }
 
+/**
+ * Sends a transcript to the backend for SmartSpeak analysis.
+ */
 export async function analyzeTranscriptRequest(transcript: string, userId?: string): Promise<AnalysisResponse> {
   const response = await fetch(resolveUrl("/api/analyze"), {
     method: "POST",
@@ -35,19 +43,34 @@ export async function analyzeTranscriptRequest(transcript: string, userId?: stri
   });
 
   if (!response.ok) {
-    throw new Error("Analysis failed");
+    const detail = await safeParseError(response);
+    throw new Error(detail ?? "Analysis failed. Please retry in a few moments.");
   }
 
   return (await response.json()) as AnalysisResponse;
 }
 
+/**
+ * Retrieves historical SmartSpeak analyses for the provided user.
+ */
 export async function fetchHistory(userId: string): Promise<HistoryEntry[]> {
   const response = await fetch(resolveUrl(`/api/history?userId=${encodeURIComponent(userId)}`));
 
   if (!response.ok) {
-    throw new Error("History request failed");
+    const detail = await safeParseError(response);
+    throw new Error(detail ?? "History request failed");
   }
 
   const payload = (await response.json()) as HistoryResponse;
   return payload.items;
+}
+
+async function safeParseError(response: Response) {
+  try {
+    const payload = (await response.json()) as { error?: string };
+    return payload.error;
+  } catch (error) {
+    console.warn("Failed to parse error response", error);
+    return undefined;
+  }
 }
