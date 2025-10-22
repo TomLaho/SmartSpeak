@@ -1,6 +1,39 @@
 import { Router } from "express";
 import { prisma } from "../db/client";
 import type { HistoryResponse } from "../types/api";
+import type { AnalysisSuggestion, SpeakingMetrics } from "../types/analysis";
+
+const DEFAULT_METRICS: SpeakingMetrics = {
+  wordsPerMinute: 0,
+  paceVariability: 0,
+  fillerWordCounts: {},
+  sentiment: "neutral",
+  energy: "medium",
+  clarity: 0,
+  organisation: 0,
+};
+
+const safeParseJson = <T>(value: unknown, fallback: T): T => {
+  if (typeof value !== "string" || value.length === 0) {
+    return fallback;
+  }
+
+  try {
+    return JSON.parse(value) as T;
+  } catch (error) {
+    console.error("Failed to parse JSON column", error);
+    return fallback;
+  }
+import type { HistoryEntry } from "../types/analysis";
+
+type StoredAnalysis = {
+  id: string;
+  userId: string;
+  transcript: string;
+  metrics: unknown;
+  suggestions: unknown;
+  createdAt: Date;
+};
 
 export const historyRouter = Router();
 
@@ -11,20 +44,22 @@ historyRouter.get("/history", async (req, res) => {
       return res.status(400).json({ error: "userId is required" });
     }
 
-    const analyses = await prisma.analysis.findMany({
+    const analyses = (await prisma.analysis.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
-    });
+    })) as StoredAnalysis[];
 
     const payload: HistoryResponse = {
       items: analyses.map((analysis) => ({
         id: analysis.id,
         userId: analysis.userId,
         transcript: analysis.transcript,
-        metrics: analysis.metrics as any,
-        suggestions: analysis.suggestions as any,
+        metrics: safeParseJson<SpeakingMetrics>(analysis.metrics, DEFAULT_METRICS),
+        suggestions: safeParseJson<AnalysisSuggestion[]>(analysis.suggestions, []),
+        metrics: analysis.metrics as HistoryEntry["metrics"],
+        suggestions: analysis.suggestions as HistoryEntry["suggestions"],
         createdAt: analysis.createdAt.toISOString(),
-      })),
+      } satisfies HistoryEntry)),
     };
 
     res.json(payload);
