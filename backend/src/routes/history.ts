@@ -1,6 +1,16 @@
 import { Router } from "express";
 import { prisma } from "../db/client";
 import type { HistoryResponse } from "../types/api";
+import type { HistoryEntry } from "../types/analysis";
+
+type StoredAnalysis = {
+  id: string;
+  userId: string;
+  transcript: string;
+  metrics: unknown;
+  suggestions: unknown;
+  createdAt: Date;
+};
 
 export const historyRouter = Router();
 
@@ -11,20 +21,20 @@ historyRouter.get("/history", async (req, res) => {
       return res.status(400).json({ error: "userId is required" });
     }
 
-    const analyses = await prisma.analysis.findMany({
+    const analyses = (await prisma.analysis.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
-    });
+    })) as StoredAnalysis[];
 
     const payload: HistoryResponse = {
       items: analyses.map((analysis) => ({
         id: analysis.id,
         userId: analysis.userId,
         transcript: analysis.transcript,
-        metrics: analysis.metrics as any,
-        suggestions: analysis.suggestions as any,
+        metrics: analysis.metrics as HistoryEntry["metrics"],
+        suggestions: analysis.suggestions as HistoryEntry["suggestions"],
         createdAt: analysis.createdAt.toISOString(),
-      })),
+      } satisfies HistoryEntry)),
     };
 
     res.json(payload);
