@@ -3,11 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push",
+    "predev": "npm run prisma:generate",
+    "dev": "concurrently -n PRISMA,SERVER -c yellow,blue \"prisma generate --watch\" \"ts-node-dev --respawn --transpile-only src/index.ts\"",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "jest",
-    "prisma:generate": "prisma generate"
+    "test": "jest"
   },
   "dependencies": {
     "@prisma/client": "^5.16.1",

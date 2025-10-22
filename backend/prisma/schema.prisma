@@ -1,17 +1,14 @@
-generator client {
-  provider = "prisma-client-js"
-}
-
 datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
-model Analysis {
-  id          String   @id @default(cuid())
-  userId      String
-  transcript  String
-  metrics     String
-  suggestions String
-  createdAt   DateTime @default(now())
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Minimal model so client can generate; extend later as needed
+model HealthCheck {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
 }

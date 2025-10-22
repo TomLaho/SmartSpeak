@@ -17,12 +17,14 @@ out/
 .env
 .env.local
 .env.*.local
+backend/.env
 
 # Prisma SQLite database
 backend/prisma/*.db
 backend/prisma/*.db-journal
 backend/prisma/**/*.db
 backend/prisma/**/*.db-journal
+backend/prisma/dev.db
 
 # Build output
 frontend/dist

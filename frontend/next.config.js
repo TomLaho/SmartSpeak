@@ -1,14 +1,15 @@
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async rewrites() {
-    return [
-      {
-        source: "/api/:path*",
-        destination: `${API}/api/:path*`,
-      },
-    ];
+    if (process.env.NODE_ENV === "development") {
+      return [
+        {
+          source: "/api/:path*",
+          destination: "http://localhost:5000/api/:path*",
+        },
+      ];
+    }
+    return [];
   },
 };
 
