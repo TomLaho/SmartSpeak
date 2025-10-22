@@ -21,6 +21,8 @@ out/
 # Prisma SQLite database
 backend/prisma/*.db
 backend/prisma/*.db-journal
+backend/prisma/**/*.db
+backend/prisma/**/*.db-journal
 
 # Build output
 frontend/dist
