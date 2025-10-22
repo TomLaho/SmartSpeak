@@ -1,5 +1,5 @@
-{
-  "compilerOptions": {
+﻿{
+  "compilerOptions": { "baseUrl": ".",
     "target": "es5",
     "lib": [
       "dom",
@@ -21,6 +21,12 @@
     "types": [
       "node"
     ],
+    "plugins": [
+      {
+        "name": "next"
+      , "paths": { "@/*": ["./*"] }}
+    ]
+    "types": ["node"],
     "baseUrl": ".",
     "paths": {
       "@/*": [
@@ -43,3 +49,4 @@
     "node_modules"
   ]
 }
+
