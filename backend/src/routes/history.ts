@@ -24,6 +24,15 @@ const safeParseJson = <T>(value: unknown, fallback: T): T => {
     console.error("Failed to parse JSON column", error);
     return fallback;
   }
+import type { HistoryEntry } from "../types/analysis";
+
+type StoredAnalysis = {
+  id: string;
+  userId: string;
+  transcript: string;
+  metrics: unknown;
+  suggestions: unknown;
+  createdAt: Date;
 };
 
 export const historyRouter = Router();
@@ -35,10 +44,10 @@ historyRouter.get("/history", async (req, res) => {
       return res.status(400).json({ error: "userId is required" });
     }
 
-    const analyses = await prisma.analysis.findMany({
+    const analyses = (await prisma.analysis.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
-    });
+    })) as StoredAnalysis[];
 
     const payload: HistoryResponse = {
       items: analyses.map((analysis) => ({
@@ -47,8 +56,10 @@ historyRouter.get("/history", async (req, res) => {
         transcript: analysis.transcript,
         metrics: safeParseJson<SpeakingMetrics>(analysis.metrics, DEFAULT_METRICS),
         suggestions: safeParseJson<AnalysisSuggestion[]>(analysis.suggestions, []),
+        metrics: analysis.metrics as HistoryEntry["metrics"],
+        suggestions: analysis.suggestions as HistoryEntry["suggestions"],
         createdAt: analysis.createdAt.toISOString(),
-      })),
+      } satisfies HistoryEntry)),
     };
 
     res.json(payload);
