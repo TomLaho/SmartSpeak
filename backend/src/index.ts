@@ -3,10 +3,13 @@ import cors from "cors";
 import express from "express";
 import { analyzeRouter } from "./routes/analyze";
 import { historyRouter } from "./routes/history";
+import { storageRouter } from "./routes/storage";
+import { transcribeRouter } from "./routes/transcribe";
 import { uploadAudioRouter } from "./routes/uploadAudio";
 
 const app = express();
 app.use(cors());
+app.use("/api/uploads/dev", express.raw({ type: "*/*", limit: "50mb" }));
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -20,6 +23,8 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api", uploadAudioRouter);
+app.use("/api", storageRouter);
+app.use("/api", transcribeRouter);
 app.use("/api", analyzeRouter);
 app.use("/api", historyRouter);
 

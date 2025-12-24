@@ -25,7 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { analyzeTranscriptRequest, uploadSpeechFile } from "@/lib/api";
-import { useLocalUser } from "@/lib/hooks/useLocalUser";
+import { useAuth } from "@/lib/auth/AuthProvider";
 import { cn } from "@/lib/utils";
 import type { AnalysisResponse } from "@/types/api";
 import BackendStatus from "./BackendStatus";
@@ -61,7 +61,7 @@ const heroHighlights = [
 ];
 
 export function SpeechAnalyzer() {
-  const { userId } = useLocalUser();
+  const { userId, isSignedIn } = useAuth();
   const [status, setStatus] = useState<StatusState>({ ...initialStatus });
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [transcript, setTranscript] = useState("");
@@ -313,7 +313,7 @@ export function SpeechAnalyzer() {
         <CardHeader className="space-y-3">
           <CardTitle className="text-2xl">Start a new analysis</CardTitle>
           <CardDescription>
-            Choose how you want to capture your speech. We'll generate a transcript, surface pacing metrics, and craft targeted recommendations.
+            Choose how you want to capture your speech. We&apos;ll generate a transcript, surface pacing metrics, and craft targeted recommendations.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
@@ -442,9 +442,9 @@ export function SpeechAnalyzer() {
                 <Button onClick={() => void handleManualSubmit()} className="gap-2">
                   <Wand2 className="h-4 w-4" aria-hidden /> Analyse transcript
                 </Button>
-                {!userId && (
+                {!isSignedIn && (
                   <p className="text-xs text-muted-foreground">
-                    Add a user ID in the header to save this analysis to your history.
+                    Sign in from the header to save this analysis to your history.
                   </p>
                 )}
               </div>

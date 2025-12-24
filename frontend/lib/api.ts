@@ -1,4 +1,11 @@
-import type { AnalysisResponse, HistoryEntry, HistoryResponse, UploadAudioResponse } from "@/types/api";
+import type {
+  AnalysisResponse,
+  HistoryEntry,
+  HistoryResponse,
+  PresignUploadResponse,
+  TranscribeResponse,
+  UploadAudioResponse,
+} from "@/types/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -63,6 +70,64 @@ export async function fetchHistory(userId: string): Promise<HistoryEntry[]> {
 
   const payload = (await response.json()) as HistoryResponse;
   return payload.items;
+}
+
+/**
+ * Requests a presigned URL for uploading audio to S3/R2 (or in-memory dev storage).
+ */
+export async function createUploadTarget(contentType: string, authToken?: string): Promise<PresignUploadResponse> {
+  const response = await fetch(resolveUrl("/api/uploads/presign"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    },
+    body: JSON.stringify({ contentType }),
+  });
+
+  if (!response.ok) {
+    const detail = await safeParseError(response);
+    throw new Error(detail ?? "Unable to prepare upload target");
+  }
+
+  return (await response.json()) as PresignUploadResponse;
+}
+
+export async function uploadToTarget(uploadUrl: string, file: File): Promise<void> {
+  const targetUrl = uploadUrl.startsWith("http") ? uploadUrl : resolveUrl(uploadUrl);
+  const response = await fetch(targetUrl, {
+    method: "PUT",
+    headers: {
+      "Content-Type": file.type || "application/octet-stream",
+    },
+    body: file,
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to upload audio to storage");
+  }
+}
+
+/**
+ * Tells the backend to fetch audio by key, run Whisper, and persist the transcript.
+ */
+export async function transcribeStoredAudio(storageKey: string, userId?: string, authToken?: string): Promise<TranscribeResponse> {
+  const response = await fetch(resolveUrl("/api/transcribe"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      ...(userId ? { "x-user-id": userId } : {}),
+    },
+    body: JSON.stringify({ storageKey, userId }),
+  });
+
+  if (!response.ok) {
+    const detail = await safeParseError(response);
+    throw new Error(detail ?? "Unable to transcribe audio");
+  }
+
+  return (await response.json()) as TranscribeResponse;
 }
 
 async function safeParseError(response: Response) {

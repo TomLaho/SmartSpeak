@@ -7,7 +7,24 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// Minimal model so client can generate; extend later as needed
+model Transcript {
+  id         String   @id @default(cuid())
+  userId     String?
+  storageKey String
+  transcript String
+  createdAt  DateTime @default(now())
+}
+
+model Analysis {
+  id          String   @id @default(cuid())
+  userId      String?
+  transcript  String
+  metrics     String
+  suggestions String
+  createdAt   DateTime @default(now())
+}
+
+// Minimal model kept for health checks and migrations
 model HealthCheck {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())

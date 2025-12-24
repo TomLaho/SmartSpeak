@@ -10,12 +10,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchHistory } from "@/lib/api";
-import { useLocalUser } from "@/lib/hooks/useLocalUser";
+import { useAuth } from "@/lib/auth/AuthProvider";
 import type { HistoryEntry } from "@/types/api";
 import { cn } from "@/lib/utils";
 
 export default function HistoryPage() {
-  const { userId } = useLocalUser();
+  const { userId } = useAuth();
   const [items, setItems] = useState<HistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

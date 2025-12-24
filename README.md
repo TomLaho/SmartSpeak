@@ -24,6 +24,8 @@ Create the following files before running the app:
   ```bash
   # Override when the backend runs on a different host/port
   NEXT_PUBLIC_API_URL=http://localhost:5000
+  # Optional Clerk publishable key to enable hosted auth widgets
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_your_key_here
   ```
 
 - `backend/.env`
@@ -31,9 +33,19 @@ Create the following files before running the app:
   ```bash
   PORT=5000
   DATABASE_URL="file:./dev.db"
+  # Whisper + storage
+  OPENAI_API_KEY=your-openai-api-key
+  S3_BUCKET=your-bucket-name
+  S3_REGION=auto
+  S3_ACCESS_KEY_ID=your-access-key
+  S3_SECRET_ACCESS_KEY=your-secret-key
+  # Optional: point to R2/MinIO-compatible endpoints
+  # S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com
+  # S3_SESSION_TOKEN=... # when using temporary credentials
+
+  # Legacy Azure speech fallback (optional)
   AZURE_API_KEY=your-azure-speech-key
   AZURE_REGION=your-azure-region
-  OPENAI_API_KEY=your-openai-api-key
   ```
 
 > ℹ️ All integrations provide deterministic fallback data when the corresponding API key is not present. This lets you explore the product end-to-end before wiring up external services.
@@ -95,6 +107,7 @@ npm --workspace frontend run lint
 ## Key features
 
 - 📼 Upload or live-record audio/video to create transcripts with Azure Speech-to-Text.
+- 🎙️ Practice page that authenticates with Clerk (or a local fallback), uploads audio via presigned URLs to S3/R2, then transcribes with Whisper and stores results in SQLite.
 - 📊 Analyse pacing, filler words, sentiment, clarity, and organisation using OpenAI (or deterministic fallbacks when offline).
 - 🧠 Guided coaching suggestions tailored to each performance.
 - 🗂️ History dashboard backed by SQLite/Prisma so returning users can review progress.

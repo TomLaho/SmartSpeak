@@ -33,3 +33,20 @@ export interface HistoryResponse {
 export interface UploadAudioResponse {
   transcript: string;
 }
+
+export interface PresignUploadResponse {
+  uploadUrl: string;
+  storageKey: string;
+  mode: "s3" | "memory";
+  expiresIn: number;
+}
+
+export interface TranscribeResponse {
+  id: string;
+  transcript: string;
+  createdAt: string;
+  userId?: string;
+  storageKey: string;
+  storageMode: "s3" | "memory";
+  location: string;
+}

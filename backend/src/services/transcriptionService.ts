@@ -1,41 +1,40 @@
-import axios from "axios";
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { randomUUID } from "crypto";
+import OpenAI from "openai";
 
-const azureApiKey = process.env.AZURE_API_KEY;
-const azureRegion = process.env.AZURE_REGION;
+const openaiApiKey = process.env.OPENAI_API_KEY;
+const openaiClient = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : null;
 
 export async function transcribeAudio(buffer: Buffer, mimeType: string): Promise<string> {
   if (!buffer.length) {
     throw new Error("Empty audio buffer");
   }
 
-  if (!azureApiKey || !azureRegion) {
-    return "This is a sample transcript generated for development when Azure credentials are missing.";
+  if (!openaiClient) {
+    return "This is a sample transcript generated locally because Whisper is not configured.";
   }
 
-  const endpoint = `https://${azureRegion}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1?language=en-US`;
+  const extension = mimeType?.split("/")[1] || "webm";
+  const tempFilePath = path.join(os.tmpdir(), `smartspeak-${randomUUID()}.${extension}`);
 
   try {
-    const response = await axios.post(endpoint, buffer, {
-      headers: {
-        "Ocp-Apim-Subscription-Key": azureApiKey,
-        "Content-Type": mimeType || "audio/wav",
-        Accept: "application/json",
-        "Transfer-Encoding": "chunked",
-      },
-      maxBodyLength: Infinity,
+    await fs.promises.writeFile(tempFilePath, buffer);
+    const response = await openaiClient.audio.transcriptions.create({
+      file: fs.createReadStream(tempFilePath),
+      model: "whisper-1",
     });
 
-    if (response.data?.DisplayText) {
-      return response.data.DisplayText as string;
+    if (response.text) {
+      return response.text;
     }
 
-    if (typeof response.data === "string") {
-      return response.data;
-    }
-
-    throw new Error("Azure Speech returned no transcript");
+    throw new Error("Whisper did not return a transcript");
   } catch (error) {
-    console.error("Azure transcription failed", error);
+    console.error("OpenAI transcription failed", error);
     return "Unable to transcribe audio. Please try again.";
+  } finally {
+    void fs.promises.unlink(tempFilePath).catch(() => undefined);
   }
 }

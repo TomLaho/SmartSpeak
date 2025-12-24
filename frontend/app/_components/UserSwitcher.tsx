@@ -1,54 +1,87 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import Link from "next/link";
-import { History, LogIn, UserRound } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { LogIn, LogOut, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useLocalUser } from "@/lib/hooks/useLocalUser";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/lib/auth/AuthProvider";
 
 export function UserSwitcher() {
-  const { userId, setUserId } = useLocalUser();
-  const [draft, setDraft] = useState(userId);
+  const { isLoaded, isSignedIn, userId, strategy, signIn, signOut, setLocalUserId, openUserProfile } = useAuth();
+  const [draft, setDraft] = useState("");
 
   useEffect(() => {
-    setDraft(userId);
-  }, [userId]);
+    if (strategy === "local" && userId) {
+      setDraft(userId);
+    }
+  }, [strategy, userId]);
+
+  const label = useMemo(() => {
+    if (!isLoaded) return "Loading user";
+    if (strategy === "clerk" && userId) return "Clerk session";
+    if (userId) return "Local session";
+    return "No session";
+  }, [isLoaded, strategy, userId]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setUserId(draft.trim());
+    if (!draft.trim()) return;
+    setLocalUserId(draft.trim());
   };
 
+  if (!isLoaded) {
+    return <Skeleton className="h-10 w-48 rounded-full" />;
+  }
+
   return (
-    <div className="flex items-center gap-2">
-      <nav
-        aria-label="Primary"
-        className="hidden items-center gap-3 rounded-full border border-border/70 bg-card/70 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur md:flex"
-      >
-        <Link href="/" className="flex items-center gap-1 transition hover:text-foreground">
-          <UserRound className="h-3.5 w-3.5" aria-hidden /> Dashboard
-        </Link>
-        <span aria-hidden className="h-4 w-px bg-border" />
-        <Link href="/history" className="flex items-center gap-1 transition hover:text-foreground">
-          <History className="h-3.5 w-3.5" aria-hidden /> History
-        </Link>
-      </nav>
-      <form
-        onSubmit={handleSubmit}
-        className="flex items-center gap-2 rounded-full border border-border/70 bg-card/70 px-3 py-1 shadow-sm backdrop-blur"
-      >
-        <Input
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder="Save analyses with your email"
-          className="h-9 w-48 border-none bg-transparent text-sm focus-visible:ring-0"
-        />
-        <Button type="submit" size="sm" variant="default" className="gap-1 text-xs font-semibold">
-          <LogIn className="h-3.5 w-3.5" aria-hidden />
-          {userId ? "Update" : "Save"}
-        </Button>
-      </form>
+    <div className="flex items-center gap-2 rounded-full border border-border/70 bg-card/70 px-3 py-1 shadow-sm backdrop-blur">
+      <div className="flex items-center gap-2">
+        <UserRound className="h-4 w-4 text-muted-foreground" aria-hidden />
+        <div className="flex flex-col leading-tight">
+          <span className="text-xs font-medium text-muted-foreground">{label}</span>
+          <span className="text-sm font-semibold text-foreground">
+            {userId ?? "Sign in to save progress"}
+          </span>
+        </div>
+      </div>
+      {isSignedIn ? (
+        <div className="flex items-center gap-1">
+          {openUserProfile && (
+            <Button size="sm" variant="ghost" onClick={openUserProfile} className="text-xs">
+              Profile
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void signOut()}
+            className="gap-1 text-xs"
+          >
+            <LogOut className="h-3.5 w-3.5" aria-hidden />
+            Sign out
+          </Button>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="flex items-center gap-2">
+          <Input
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder="Email for history"
+            className="h-9 w-40 border-none bg-transparent text-sm focus-visible:ring-0"
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="default"
+            className="gap-1 text-xs font-semibold"
+            onClick={() => signIn()}
+          >
+            <LogIn className="h-3.5 w-3.5" aria-hidden />
+            Sign in
+          </Button>
+        </form>
+      )}
     </div>
   );
 }
