@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Plan {
+  FREE
+  PRO
+}
+
+enum SessionMode {
+  FREE
+  READ
+  TOPIC
+}
+
+enum SessionStatus {
+  UPLOADED
+  TRANSCRIBED
+  ANALYZED
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id                    String   @id
+  email                 String   @unique
+  plan                  Plan     @default(FREE)
+  lifetimeSessionsUsed  Int      @default(0)
+  stripeCustomerId      String?  @unique
+  stripeSubscriptionId  String?  @unique
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  sessions              SpeechSession[]
+}
+
+model SpeechSession {
+  id              String        @id @default(cuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+  title           String
+  mode            SessionMode
+  promptText      String?
+  audioKey        String
+  audioMimeType   String
+  durationSeconds Float?
+  transcript      String?
+  metrics         Json?
+  feedback        Json?
+  status          SessionStatus @default(UPLOADED)
+  error           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}

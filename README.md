@@ -1,100 +1,92 @@
-# SmartSpeak Monorepo
+# SmartSpeak
 
-SmartSpeak is a full-stack public speaking coach. The Next.js frontend lets you record or upload a speech, visualise analysis insights, and review your history. The Express backend connects to Azure Speech-to-Text and the OpenAI API, falling back to deterministic sample data during development when credentials are absent.
+SmartSpeak is an AI-powered speech coaching MVP built with Next.js, Clerk, Stripe, Prisma (Postgres), Tailwind, and OpenAI. Users can record or upload practice audio, transcribe with Whisper, compute deterministic speech metrics, and receive structured coaching feedback via GPT-4o-mini. Free users get 3 lifetime sessions; paid users (Stripe subscription) get unlimited sessions.
 
-## Prerequisites
+## Features
+- Record or upload 2–5 minute practice sessions with in-browser recording
+- Whisper-based transcription (server-side)
+- Deterministic speech metrics: WPM, fillers, pauses, structure proxies, SmartSpeak score
+- Structured LLM feedback (JSON) with concise strengths, improvements, and quick wins
+- Dashboard, Practice flow, History, and Session analysis views
+- Paywall enforcement (free: 3 lifetime sessions; pro: unlimited) with Stripe Checkout + webhook handling
+- Private audio storage on S3-compatible buckets (Cloudflare R2 recommended) using presigned URLs
+- Optional background analysis worker via BullMQ + Redis
 
-- [Node.js](https://nodejs.org/) 18 or newer
-- npm 9 or newer
+## Getting Started
+### Prerequisites
+- Node.js 18+
+- pnpm
+- Postgres database (Neon/Supabase/local)
+- S3-compatible bucket (Cloudflare R2 recommended)
+- Stripe account + CLI for local webhooks
+- OpenAI API key
+
+### Environment
+Copy `.env.example` to `.env` and fill in values:
+
+```
+cp .env.example .env
+```
+
+Key variables:
+- `DATABASE_URL` Postgres connection string
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` Clerk keys
+- `OPENAI_API_KEY`, `OPENAI_TRANSCRIBE_MODEL=whisper-1`, `OPENAI_COACH_MODEL=gpt-4o-mini`
+- `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET`, `S3_REGION`, `S3_PUBLIC_BASE_URL`
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID_MONTHLY`, `APP_URL`
+- `REDIS_URL` (optional for BullMQ worker)
+
+### Setup
+1) Install deps
+```
+pnpm install
+```
+
+2) Prisma migration + seed
+```
+pnpm prisma:migrate
+pnpm prisma:seed
+```
+
+3) Run dev server
+```
+pnpm dev
+```
+App runs on http://localhost:3000.
+
+4) Optional worker
+```
+pnpm worker
+```
+
+### Clerk
+- Configure an application in Clerk using Email magic links.
+- Set authorized redirect to `http://localhost:3000`.
+
+### Stripe
+- Create a recurring price and set `STRIPE_PRICE_ID_MONTHLY`.
+- Start the dev server, then run the Stripe CLI to forward webhooks:
+```
+stripe listen --forward-to localhost:3000/api/stripe/webhook
+```
+
+### Storage
+- Use Cloudflare R2 or any S3-compatible bucket.
+- Ensure the access keys are set and the bucket exists. Files are private and accessed via signed URLs only.
+
+### Notes
+- All AI calls occur server-side; API keys are never exposed to the client.
+- Free-tier enforcement happens in `/api/transcribe` and `/api/analyze`; exceeding the quota returns HTTP 402.
+- Max upload size: 20MB client-side guard; duration validated up to 10 minutes.
+- The UI provides clear states for uploading, transcribing, editing, and analyzing.
 
 ## Project Structure
-
-```
-.
-├── backend/   # Express + TypeScript API server + Prisma ORM
-└── frontend/  # Next.js App Router client with Tailwind and shadcn/ui
-```
-
-## Environment configuration
-
-Create the following files before running the app:
-
-- `frontend/.env.local`
-
-  ```bash
-  # Override when the backend runs on a different host/port
-  NEXT_PUBLIC_API_URL=http://localhost:5000
-  ```
-
-- `backend/.env`
-
-  ```bash
-  PORT=5000
-  DATABASE_URL="file:./dev.db"
-  AZURE_API_KEY=your-azure-speech-key
-  AZURE_REGION=your-azure-region
-  OPENAI_API_KEY=your-openai-api-key
-  ```
-
-> ℹ️ All integrations provide deterministic fallback data when the corresponding API key is not present. This lets you explore the product end-to-end before wiring up external services.
-
-After setting the environment values, create the SQLite database schema:
-
-```bash
-npm --workspace backend run prisma:generate
-npx prisma migrate deploy --schema backend/prisma/schema.prisma
-```
-
-## Installation
-
-Install dependencies for both workspaces from the repository root:
-
-```bash
-npm install
-```
-
-## Local development
-
-Run the frontend and backend concurrently:
-
-```bash
-npm run dev
-```
-
-- Frontend: [http://localhost:3000](http://localhost:3000)
-- Backend API: [http://localhost:5000](http://localhost:5000)
-
-## Production build
-
-```bash
-npm run build
-
-# Start the compiled backend
-cd backend
-npm run start
-
-# Start the Next.js server
-cd ../frontend
-npm run start
-```
+- `app/` Next.js App Router pages and API routes
+- `lib/` shared utilities (db, storage, stripe, openai, metrics)
+- `prisma/` schema and seed
+- `components/ui/` shadcn-inspired UI primitives
+- `worker/` optional BullMQ worker for background analysis
 
 ## Testing
-
-The backend ships with Jest tests for the speech analysis helpers:
-
-```bash
-npm --workspace backend run test
-```
-
-You can also lint the frontend project:
-
-```bash
-npm --workspace frontend run lint
-```
-
-## Key features
-
-- 📼 Upload or live-record audio/video to create transcripts with Azure Speech-to-Text.
-- 📊 Analyse pacing, filler words, sentiment, clarity, and organisation using OpenAI (or deterministic fallbacks when offline).
-- 🧠 Guided coaching suggestions tailored to each performance.
-- 🗂️ History dashboard backed by SQLite/Prisma so returning users can review progress.
+- Run `pnpm lint` to lint the codebase.
+- Use `pnpm dev` for local validation and manual end-to-end checks.
