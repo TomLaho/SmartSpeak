@@ -1,22 +1,30 @@
 /**
  * SmartSpeak curriculum.
  *
- * The product is a Duolingo-style daily trainer: short (~3-5 minute) guided
- * exercises split across two skill tracks — DELIVERY (the technical craft of
- * pace, pauses, intonation, projection) and STORYTELLING (hooks, structure,
- * clarity, making ideas captivating and easy to follow).
+ * SmartSpeak is a presentation coach for work. The product is a daily trainer of
+ * short (~1 minute) guided reps built around the moments that actually decide a
+ * meeting: reading out findings, walking a deck, pitching a strategy, defending
+ * an implementation plan, giving a status update, and handling tough questions.
  *
- * Each track is an ordered "path" of exercises. Exercises declare which
- * dimensions they focus on so the coach can weight feedback toward what the
- * learner is actually practising.
+ * Reps are organised into three skill paths:
+ *   DELIVERY    — the technical craft: pace, deliberate pauses, vocal authority,
+ *                 emphasis on the numbers, and zero filler.
+ *   STRUCTURE   — leading with the point (BLUF), turning data into a "so what",
+ *                 and making one idea land and stick.
+ *   INFLUENCE   — persuading stakeholders, making a clear ask, and staying
+ *                 composed and credible under questions.
+ *
+ * Each path is an ordered "path" of exercises. Exercises declare which
+ * dimensions they train so the coach can weight feedback toward what the
+ * presenter is actually practising.
  */
 
-export type TrackId = 'delivery' | 'storytelling';
+export type TrackId = 'delivery' | 'structure' | 'influence';
 
 export type ExerciseType =
-  | 'read' // read provided text aloud (great for pace / intonation drills)
-  | 'topic' // respond to an impromptu prompt
-  | 'story'; // tell a structured story
+  | 'read' // read provided text aloud (great for pace / emphasis drills)
+  | 'topic' // respond to a realistic work prompt
+  | 'story'; // walk through a connected, multi-beat narrative
 
 /** Dimensions the coach can score. Delivery ones come from audio analysis. */
 export type Dimension =
@@ -50,6 +58,8 @@ export interface Exercise {
   /** One-line description shown on the path node. */
   summary: string;
   type: ExerciseType;
+  /** The real work moment this rep rehearses (shown as a chip). */
+  scenario: string;
   /** Target speaking time in seconds (the recommended length of the take). */
   targetSeconds: number;
   /** Step-by-step instructions shown before recording. */
@@ -70,18 +80,26 @@ export const TRACKS: Record<TrackId, Track> = {
   delivery: {
     id: 'delivery',
     name: 'Delivery',
-    tagline: 'Pace, pauses, intonation & presence',
+    tagline: 'Pace, pauses & vocal authority',
     emoji: '🎙️',
     gradient: 'from-violet-500 to-indigo-600',
     accent: '#7c3aed',
   },
-  storytelling: {
-    id: 'storytelling',
-    name: 'Storytelling',
-    tagline: 'Hook, structure & make it land',
-    emoji: '✨',
+  structure: {
+    id: 'structure',
+    name: 'Structure',
+    tagline: 'Lead with the point, make it land',
+    emoji: '🧩',
     gradient: 'from-sky-500 to-blue-600',
     accent: '#2563eb',
+  },
+  influence: {
+    id: 'influence',
+    name: 'Influence & Q&A',
+    tagline: 'Persuade and hold up under pressure',
+    emoji: '🤝',
+    gradient: 'from-emerald-500 to-teal-600',
+    accent: '#10b981',
   },
 };
 
@@ -92,20 +110,21 @@ export const EXERCISES: Exercise[] = [
     track: 'delivery',
     order: 1,
     level: 1,
-    title: 'Find Your Pace',
+    title: 'Boardroom Pace',
     emoji: '🏃',
-    summary: 'Read at a steady, confident ~140 words/min.',
+    summary: 'Present at a steady, confident ~140 words/min.',
     type: 'read',
+    scenario: 'Opening a presentation',
     targetSeconds: 60,
     focus: ['pace', 'pauses'],
     readingText:
-      'Great speakers are rarely the fastest talkers in the room. They move at a pace the audience can follow, giving each idea a moment to land. Read this passage out loud as if you were explaining it to a friend across the table. Not too fast, not too slow — just clear, calm, and deliberate. Notice how a steady rhythm makes you sound more sure of yourself, even before you say anything remarkable.',
+      'Thanks everyone for making the time. In the next ten minutes I want to walk you through what we found, what it means for the roadmap, and the one decision I need from this group today. I will keep it tight, leave room for questions, and flag clearly where I am confident and where we are still learning. Let us start with the headline, and then I will show you the evidence behind it.',
     instructions: [
-      'Read the passage aloud at a relaxed, conversational pace.',
-      'Aim for roughly 130–160 words per minute — about this paragraph in ~25 seconds.',
-      "Don't rush the ending. Let the last sentence breathe.",
+      'Read the passage aloud as if you were opening a real meeting.',
+      'Aim for roughly 130–160 words per minute — about this passage in ~30 seconds.',
+      "Don't rush the last line. Let the final sentence settle before you'd move to the next slide.",
     ],
-    tips: ['Imagine one real person listening.', 'Slowing down by 10% almost always sounds better on playback.'],
+    tips: ['Pick one person to present to, not the whole room.', 'Slowing down by 10% almost always reads as more senior on playback.'],
     xp: 20,
   },
   {
@@ -113,20 +132,21 @@ export const EXERCISES: Exercise[] = [
     track: 'delivery',
     order: 2,
     level: 1,
-    title: 'The Power of the Pause',
+    title: 'The Power Pause',
     emoji: '⏸️',
-    summary: 'Use deliberate silence to add weight to your words.',
+    summary: 'Use deliberate silence before your key number and your ask.',
     type: 'read',
-    targetSeconds: 60,
+    scenario: 'Landing a key point',
+    targetSeconds: 55,
     focus: ['pauses', 'pace'],
     readingText:
-      'Here is the secret. [pause] The pause is not empty space. [pause] It is the moment your idea actually lands. When you stop talking, the audience leans in. Silence says: this part matters. So the next time you make an important point, resist the urge to fill the gap. Say the line. [pause] Then stop. [pause] And let it breathe.',
+      'Here is the number that matters. [pause] Revenue from the new segment grew forty percent quarter over quarter. [pause] That is not a blip — it is the trend we bet on a year ago. So here is what I am asking for. [pause] Move two engineers onto this team for the next quarter, and let us double down while the window is open.',
     instructions: [
       'Read aloud and take a real, full second of silence everywhere it says [pause].',
       'Do not say the word "pause" — just stop, count one-one-thousand, and continue.',
-      'Feel how uncomfortable (and powerful) a real pause is.',
+      'Notice how the silence makes the number and the ask feel deliberate, not nervous.',
     ],
-    tips: ['A pause feels twice as long to you as it does to your audience.', 'Pause before your key point, not just after.'],
+    tips: ['A pause feels twice as long to you as it does to the room.', 'Pause before your key point, not just after it.'],
     xp: 20,
   },
   {
@@ -134,162 +154,287 @@ export const EXERCISES: Exercise[] = [
     track: 'delivery',
     order: 3,
     level: 2,
-    title: 'Kill the Filler',
+    title: 'Cut the Filler',
     emoji: '🚫',
-    summary: 'Speak for 60s on a topic with zero "um" or "uh".',
+    summary: 'Give a 60s status update with zero "um", "uh" or "like".',
     type: 'topic',
+    scenario: 'Status update',
     targetSeconds: 60,
     focus: ['fillers', 'pauses', 'pace'],
-    prompt: 'Describe your morning routine, step by step.',
+    prompt: 'Give a quick status update on a project you are working on: where it stands, what is on track, and what is at risk.',
     instructions: [
-      'Speak for about a minute on the prompt.',
-      'Every time you would say "um", "uh", "like", or "you know" — pause silently instead.',
-      'A clean silence always beats a filler word.',
+      'Speak for about a minute as if updating your team in a standup.',
+      'Every time you would say "um", "uh", "like", "so", or "you know" — pause silently instead.',
+      'A clean silence always sounds more in-control than a filler word.',
     ],
-    tips: ['Fillers are a fear of silence. Replace them with a breath.', 'Slowing down gives your brain time to find the next word.'],
+    tips: ['Fillers are a fear of silence. Replace each one with a breath.', 'Slowing down gives your brain time to find the next word.'],
     xp: 25,
   },
   {
-    id: 'd4-intonation',
+    id: 'd4-emphasis',
     track: 'delivery',
     order: 4,
     level: 2,
-    title: 'Vocal Variety',
+    title: 'Land the Number',
     emoji: '🎵',
-    summary: 'Beat the monotone — ride the melody of your voice.',
+    summary: 'Beat the monotone — put weight on the metrics that matter.',
     type: 'read',
-    targetSeconds: 60,
+    scenario: 'Presenting results',
+    targetSeconds: 55,
     focus: ['intonation', 'energy', 'pace'],
     readingText:
-      "I could not believe it. We had been working for six months, and finally — finally — it worked. At first nothing happened. Then the screen lit up, the numbers climbed, and the whole room went completely silent. And then everyone started cheering at once. It was, without a doubt, the best moment of the entire year.",
+      'The results are in, and they are better than we expected. Sign-ups are up sixty percent. Support tickets are down by a third. And — this is the one I care about most — customers who tried the new flow were twice as likely to come back the next week. Three numbers, one story: the change is working, and it is working faster than we planned.',
     instructions: [
-      'Read this like you are telling an exciting story to a friend.',
-      'Let your pitch rise with surprise and fall on the resolutions.',
-      'Exaggerate the melody — it will feel like too much and sound just right.',
+      'Read this like you are genuinely pleased to share good results.',
+      'Lift your pitch and slow down on each number — let "sixty percent", "a third", and "twice" stand out.',
+      'Drop your voice on the closing line so it lands with authority.',
     ],
-    tips: ['Monotone reads as boredom or nerves, even when you feel neither.', 'Smile on the upbeats — it lifts your pitch automatically.'],
+    tips: ['Monotone reads as boredom or nerves, even when you feel neither.', 'Say the number ~20% slower than the words around it and it will sound important.'],
     xp: 25,
   },
   {
-    id: 'd5-emphasis',
+    id: 'd5-presence',
     track: 'delivery',
     order: 5,
     level: 3,
-    title: 'Project & Emphasize',
+    title: 'Command the Room',
     emoji: '💥',
-    summary: 'Drive energy into the words that carry your meaning.',
+    summary: 'Open a meeting with calm energy and presence.',
     type: 'topic',
-    targetSeconds: 75,
-    focus: ['energy', 'intonation', 'pace', 'pauses'],
-    prompt: 'Convince me to try your favourite hobby — make it sound irresistible.',
+    scenario: 'Kicking off a meeting',
+    targetSeconds: 70,
+    focus: ['energy', 'intonation', 'pauses', 'pace'],
+    prompt: 'Kick off a meeting you actually run or attend. Welcome the room, set the agenda in one breath, and say why it matters today.',
     instructions: [
-      'Pitch your hobby with real enthusiasm and volume.',
-      'Hit the one or two words in each sentence that matter most.',
-      'Vary your energy: build to peaks, then pull back.',
+      'Start with a warm, confident greeting — then a beat of silence.',
+      'State the purpose and the agenda crisply: "Today we will cover X, decide Y, and leave with Z."',
+      'Vary your energy — warm on the welcome, firm on the purpose.',
     ],
-    tips: ['Energy is contagious — and so is flatness.', 'Stand up if you can. Your voice follows your body.'],
+    tips: ['Energy is contagious in a room — and so is flatness.', 'Stand up if you can. Your voice and presence follow your posture.'],
     xp: 30,
   },
 
-  // ───────────────────────── STORYTELLING ─────────────────────────
+  // ─────────────────────────── STRUCTURE ───────────────────────────
   {
-    id: 's1-hook',
-    track: 'storytelling',
+    id: 's1-bluf',
+    track: 'structure',
     order: 1,
     level: 1,
-    title: 'Hook in 10 Seconds',
-    emoji: '🪝',
-    summary: 'Open so people cannot look away.',
+    title: 'Lead With the Headline',
+    emoji: '🗞️',
+    summary: 'Answer first: state the finding and recommendation up front.',
     type: 'topic',
+    scenario: 'Discussing findings',
     targetSeconds: 45,
-    focus: ['hook', 'concreteness', 'clarity'],
-    prompt: 'Tell me about the last thing that genuinely surprised you — but start with the most gripping sentence you can.',
+    focus: ['hook', 'clarity', 'structure'],
+    prompt:
+      'You have just finished a piece of analysis. In your first two sentences, give the single most important finding and what you recommend we do — before any background or methodology.',
     instructions: [
-      'Spend your first sentence earning attention: a question, a bold claim, or a vivid scene.',
-      'No throat-clearing ("So, today I want to talk about…"). Drop us straight in.',
-      'Then tell the rest in under a minute.',
+      'Open with the bottom line: "The headline is… and I recommend we…".',
+      'No throat-clearing ("So, the way we approached this was…"). The conclusion comes first.',
+      'Only after the headline, give one sentence of the why.',
     ],
-    tips: ['Start in the middle of the action, not the background.', 'A specific detail hooks harder than a general statement.'],
+    tips: ['Busy audiences decide in the first 15 seconds whether to lean in.', 'If they had to leave after one sentence, what is the one thing they must hear?'],
     xp: 25,
   },
   {
-    id: 's2-simple',
-    track: 'storytelling',
+    id: 's2-finding',
+    track: 'structure',
     order: 2,
     level: 1,
-    title: 'Explain It Simply',
-    emoji: '🧒',
-    summary: 'Explain something complex so a 10-year-old gets it.',
+    title: 'Present a Finding',
+    emoji: '📊',
+    summary: 'Turn one data point into data → insight → so-what.',
     type: 'topic',
-    targetSeconds: 75,
-    focus: ['clarity', 'concreteness', 'structure'],
-    prompt: 'Explain how something you understand well actually works (your job, a hobby, a concept) — as if to a curious 10-year-old.',
+    scenario: 'Findings readout',
+    targetSeconds: 70,
+    focus: ['structure', 'concreteness', 'clarity'],
+    prompt:
+      'Walk me through one finding from recent work in three beats: what the data showed, what it means, and what we should do about it.',
     instructions: [
-      'Use plain words. Trade jargon for everyday language.',
-      'Lean on a comparison or analogy to something familiar.',
-      'Short sentences. One idea at a time.',
+      'Beat 1 — the data: one specific number or observation.',
+      'Beat 2 — the insight: what it actually means (the "so what").',
+      'Beat 3 — the action: what you recommend because of it.',
     ],
-    tips: ['If you need a fancy word, follow it immediately with "which just means…".', 'Concrete examples beat abstract definitions every time.'],
+    tips: ['A number with no "so what" is trivia. Always land the implication.', 'Name the one metric that matters most and build around it.'],
     xp: 30,
   },
   {
-    id: 's3-arc',
-    track: 'storytelling',
+    id: 's3-simple',
+    track: 'structure',
     order: 3,
     level: 2,
-    title: 'The Story Arc',
-    emoji: '🎢',
-    summary: 'Setup → tension → resolution, in 90 seconds.',
-    type: 'story',
-    targetSeconds: 90,
-    focus: ['structure', 'hook', 'concreteness', 'clarity'],
-    prompt: 'Tell a true story about a time something went wrong and what you learned.',
+    title: 'Explain It Simply',
+    emoji: '🧠',
+    summary: 'Explain something technical to a non-expert stakeholder.',
+    type: 'topic',
+    scenario: 'Briefing a stakeholder',
+    targetSeconds: 75,
+    focus: ['clarity', 'concreteness', 'structure'],
+    prompt:
+      'Explain a technical or specialised part of your work to a senior stakeholder who is smart but not an expert. No jargon.',
     instructions: [
-      'Set the scene quickly: who, where, what was at stake.',
-      'Build the tension — what was the problem or turning point?',
-      'Land the resolution and the one thing it taught you.',
+      'Use plain words. Trade every acronym and bit of jargon for everyday language.',
+      'Lean on one analogy or comparison to something they already understand.',
+      'Short sentences. One idea at a time.',
     ],
-    tips: ['Every good story has a moment where it could have gone either way.', 'End on the meaning, not just the events.'],
+    tips: ['If you must use a technical term, follow it instantly with "which just means…".', 'A concrete example beats a precise definition every time.'],
+    xp: 30,
+  },
+  {
+    id: 's4-deck',
+    track: 'structure',
+    order: 4,
+    level: 2,
+    title: 'Walk the Deck',
+    emoji: '🖥️',
+    summary: 'Narrate three slides as one connected story — no reading.',
+    type: 'story',
+    scenario: 'Deck walkthrough',
+    targetSeconds: 90,
+    focus: ['structure', 'hook', 'clarity', 'concreteness'],
+    prompt:
+      'Imagine three slides: (1) the problem, (2) your recommendation, (3) the impact. Talk me through them as one connected story — the way you would present, not read, a deck.',
+    instructions: [
+      'Open on the problem so the recommendation feels needed.',
+      'Use transitions to connect the slides ("which is why…", "so we should…", "and that means…").',
+      'Finish on the impact — the change your recommendation creates.',
+    ],
+    tips: ['Slides are your backdrop, not your script — talk to the room, not the screen.', 'Each slide should earn the next one. If it does not advance the story, cut it.'],
     xp: 35,
   },
   {
-    id: 's4-concrete',
-    track: 'storytelling',
-    order: 4,
-    level: 2,
-    title: 'Make It Concrete',
-    emoji: '🔍',
-    summary: 'Swap vague abstractions for vivid specifics.',
-    type: 'topic',
-    targetSeconds: 60,
-    focus: ['concreteness', 'clarity', 'hook'],
-    prompt: 'Describe a place that matters to you — make me see, hear, and feel it.',
-    instructions: [
-      'Avoid vague words like "nice", "good", "stuff", "things".',
-      'Use specific names, numbers, sounds, colours, and textures.',
-      'Show one tiny detail instead of telling the whole picture.',
-    ],
-    tips: ['"A battered red bike" beats "a bike".', 'Specific is memorable. Generic is forgettable.'],
-    xp: 30,
-  },
-  {
     id: 's5-onebigidea',
-    track: 'storytelling',
+    track: 'structure',
     order: 5,
     level: 3,
     title: 'The One Big Idea',
     emoji: '🎯',
-    summary: 'Say a lot by making one point land hard.',
+    summary: 'Make one strategic point land hard and stick.',
     type: 'topic',
+    scenario: 'Pitching a strategy',
     targetSeconds: 90,
     focus: ['structure', 'clarity', 'concreteness', 'hook'],
-    prompt: 'Pick something you believe and have 90 seconds to convince me. State your one big idea, support it, repeat it.',
+    prompt:
+      'You have 90 seconds with leadership to land one strategic idea. State it in one clear sentence, prove it with a single example, then repeat it in different words.',
     instructions: [
-      'Open by stating your single core message in one clear sentence.',
-      'Give one story or example that proves it.',
-      'Close by repeating the core message in slightly different words.',
+      'Open by stating your single core message in one sentence.',
+      'Give one story, number, or example that proves it.',
+      'Close by restating the core message — slightly reworded so it sticks.',
     ],
-    tips: ['If you make three points, people remember none. Make one.', 'Repetition of the core idea is what survives after you stop talking.'],
+    tips: ['Make three points and people remember none. Make one and they repeat it for you.', 'The sentence they quote in the hallway afterwards is the one you should rehearse.'],
+    xp: 40,
+  },
+
+  // ─────────────────────────── INFLUENCE ───────────────────────────
+  {
+    id: 'i1-execsummary',
+    track: 'influence',
+    order: 1,
+    level: 1,
+    title: 'The 60-Second Summary',
+    emoji: '⏱️',
+    summary: 'Summarise a whole project for a busy executive.',
+    type: 'topic',
+    scenario: 'Executive summary',
+    targetSeconds: 60,
+    focus: ['structure', 'clarity', 'concreteness'],
+    prompt:
+      'A senior leader stops you in the hallway: "Give me the 60-second version." Summarise the situation, your recommendation, and the one thing you need from them.',
+    instructions: [
+      'Situation in one or two sentences — where things stand.',
+      'Recommendation — what you think we should do, stated plainly.',
+      'The ask — the single decision or support you need, and by when.',
+    ],
+    tips: ['Executives buy the recommendation, not the journey. Lead with it.', 'End on the ask so they know exactly what to do next.'],
+    xp: 30,
+  },
+  {
+    id: 'i2-ask',
+    track: 'influence',
+    order: 2,
+    level: 1,
+    title: 'Make the Ask',
+    emoji: '🙋',
+    summary: 'Ask for budget, headcount, or a decision — clearly.',
+    type: 'topic',
+    scenario: 'Asking for resources',
+    targetSeconds: 60,
+    focus: ['clarity', 'concreteness', 'energy'],
+    prompt:
+      'Ask for what your project actually needs — budget, a hire, or a decision. Be specific about what you need, why it matters, and by when.',
+    instructions: [
+      'Name the ask in one direct sentence — no hedging or apologising.',
+      'Tie it to the outcome it unlocks and the cost of waiting.',
+      'Give a clear deadline so the ask cannot quietly stall.',
+    ],
+    tips: ['"It would be great to maybe get some help" gets nothing. Ask for the specific thing.', 'Confidence in the ask signals confidence in the plan.'],
+    xp: 30,
+  },
+  {
+    id: 'i3-toughq',
+    track: 'influence',
+    order: 3,
+    level: 2,
+    title: 'Handle the Tough Question',
+    emoji: '🛡️',
+    summary: 'Stay composed and answer-first under pressure.',
+    type: 'topic',
+    scenario: 'Q&A under pressure',
+    targetSeconds: 60,
+    focus: ['clarity', 'structure', 'pauses', 'concreteness'],
+    prompt:
+      'A stakeholder challenges you: "Why should we believe this will actually work?" Take a breath, answer directly first, acknowledge the concern, and back it up with evidence.',
+    instructions: [
+      'Pause for a full second before you answer — composure reads as credibility.',
+      'Lead with a direct answer, then say "and the reason I am confident is…".',
+      'Acknowledge the concern honestly; do not get defensive or over-explain.',
+    ],
+    tips: ['A one-second pause before answering makes you look thoughtful, not stumped.', 'Answer the question they asked first; add nuance second.'],
+    xp: 35,
+  },
+  {
+    id: 'i4-plan',
+    track: 'influence',
+    order: 4,
+    level: 2,
+    title: 'Defend the Plan',
+    emoji: '🗂️',
+    summary: 'Walk an implementation plan: ships-first, milestones, risk.',
+    type: 'story',
+    scenario: 'Implementation plan',
+    targetSeconds: 90,
+    focus: ['structure', 'concreteness', 'clarity'],
+    prompt:
+      'Present your implementation plan: what ships first, the two or three key milestones, and the single biggest risk and how you will manage it.',
+    instructions: [
+      'Start with what ships first and why that is the right first step.',
+      'Name the milestones with rough timing — make it feel real and sequenced.',
+      'Surface the biggest risk yourself, then your mitigation. Owning it builds trust.',
+    ],
+    tips: ['Naming your own risk disarms the person about to raise it.', 'Specific milestones with dates sound like a plan; vague phases sound like a wish.'],
+    xp: 35,
+  },
+  {
+    id: 'i5-buyin',
+    track: 'influence',
+    order: 5,
+    level: 3,
+    title: 'Bring Them With You',
+    emoji: '🤝',
+    summary: 'Win over a skeptical team and end on a call to action.',
+    type: 'topic',
+    scenario: 'Driving buy-in',
+    targetSeconds: 90,
+    focus: ['hook', 'structure', 'energy', 'clarity'],
+    prompt:
+      'Convince a skeptical team to get behind a change. Name the objection out loud, answer it head-on, and finish with a clear call to action.',
+    instructions: [
+      'Open by naming the elephant in the room — the objection they are already thinking.',
+      'Answer it directly, then make the case for the change with one concrete benefit.',
+      'End on a specific call to action: what you want them to do, starting when.',
+    ],
+    tips: ['Saying the objection out loud first earns the right to be heard.', 'People commit to a clear next step, not a vague "let us align".'],
     xp: 40,
   },
 ];
@@ -300,17 +445,26 @@ export const exercisesByTrack = (track: TrackId): Exercise[] =>
 export const getExercise = (id: string): Exercise | undefined =>
   EXERCISES.find((e) => e.id === id);
 
+/**
+ * The next exercise the presenter should do: the first one they have not yet
+ * attempted, in path order. Falls back to the very first exercise. Powers the
+ * "Continue" / "Today's focus" card on the home screen.
+ */
+export const nextExercise = (attempted: (id: string) => boolean): Exercise => {
+  return EXERCISES.find((e) => !attempted(e.id)) ?? EXERCISES[0];
+};
+
 export const DIMENSION_LABELS: Record<Dimension, string> = {
   pace: 'Pace',
   pauses: 'Pauses',
   intonation: 'Intonation',
   energy: 'Energy',
   fillers: 'Filler words',
-  hook: 'Hook',
+  hook: 'Opening',
   structure: 'Structure',
   clarity: 'Clarity',
-  concreteness: 'Concreteness',
+  concreteness: 'Specifics',
 };
 
-/** Daily XP target for the "5 minutes a day" habit loop. */
+/** Daily XP target for the "one rep a day" habit loop. */
 export const DAILY_GOAL_XP = 30;

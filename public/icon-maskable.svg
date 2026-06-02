@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7c3aed"/>
+      <stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+  </defs>
+  <!-- Full-bleed background: Android applies the adaptive mask. -->
+  <rect width="192" height="192" fill="url(#g)"/>
+  <!-- Mark scaled into the central safe zone (~74%) so no mask crops it. -->
+  <g transform="translate(96 96) scale(0.74) translate(-96 -96)">
+    <g fill="#fff">
+      <rect x="86" y="36" width="20" height="70" rx="10"/>
+      <path d="M64 92a32 32 0 0 0 64 0h-14a18 18 0 0 1-36 0z"/>
+      <rect x="86" y="130" width="20" height="26" rx="6"/>
+      <rect x="66" y="150" width="60" height="12" rx="6"/>
+    </g>
+    <g fill="#fde68a">
+      <circle cx="146" cy="52" r="6"/>
+      <circle cx="162" cy="74" r="4"/>
+      <circle cx="150" cy="92" r="3"/>
+    </g>
+  </g>
+</svg>

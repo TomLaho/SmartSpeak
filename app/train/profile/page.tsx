@@ -25,7 +25,7 @@ export default function ProfilePage() {
           🗣️
         </div>
         <div>
-          <p className="font-semibold">Speaker</p>
+          <p className="font-semibold">Presenter</p>
           <p className="text-sm text-white/55">
             {(progress?.xp ?? 0).toLocaleString()} XP · 🔥 {progress?.streak ?? 0} day streak
           </p>
@@ -33,10 +33,10 @@ export default function ProfilePage() {
       </div>
 
       <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/60">
-        <p className="font-semibold text-white/80">Demo mode</p>
+        <p className="font-semibold text-white/80">🔒 Private by design</p>
         <p className="mt-1">
-          You&apos;re training with <span className="text-white/80">no account and no server</span>. Recordings are
-          analysed entirely on your device and your progress is saved in this browser.
+          You&apos;re practising with <span className="text-white/80">no account and no server</span>. Your voice is
+          analysed entirely on your device and never uploaded — your progress is saved privately in this browser.
         </p>
         <p className="mt-2">
           Live transcription:{' '}
@@ -49,7 +49,7 @@ export default function ProfilePage() {
       <div className="space-y-3">
         <Button asChild variant="secondary" className="h-12 w-full justify-between rounded-2xl bg-white/10 hover:bg-white/20">
           <Link href="/train">
-            <span>🎯 Today&apos;s workout</span>
+            <span>🎯 Today&apos;s session</span>
             <span className="text-white/40">›</span>
           </Link>
         </Button>
