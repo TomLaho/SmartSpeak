@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { getOrCreateUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { computeMetrics } from '@/lib/metrics';
-import { COACH_MODEL, openai } from '@/lib/openai';
+import { COACH_MODEL, getOpenAI } from '@/lib/openai';
 import { canUseSession } from '@/lib/plan';
 import { rateLimit } from '@/lib/rate-limit';
 import { Plan, SessionStatus } from '@prisma/client';
@@ -67,7 +67,7 @@ Respond ONLY with JSON matching:
 Limit total characters to 1200.
 Transcript:\\n${transcript}`;
 
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAI().chat.completions.create({
       model: COACH_MODEL,
       messages: [
         { role: 'system', content: 'Provide actionable but concise speech coaching.' },

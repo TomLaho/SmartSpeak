@@ -1,0 +1,93 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { isSpeechRecognitionSupported } from '@/lib/speech-recognition';
+import { loadProgress, resetProgress, type Progress } from '@/lib/local-store';
+import { Button } from '@/components/ui/button';
+
+export default function ProfilePage() {
+  const [progress, setProgress] = useState<Progress | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [speech, setSpeech] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    setProgress(loadProgress());
+    setSpeech(isSpeechRecognitionSupported());
+  }, []);
+
+  return (
+    <div className="px-5 pb-8 pt-6">
+      <h1 className="mb-5 text-2xl font-bold">Profile</h1>
+
+      <div className="mb-6 flex items-center gap-4 rounded-3xl border border-white/10 bg-white/5 p-5">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-blue-600 text-2xl">
+          🗣️
+        </div>
+        <div>
+          <p className="font-semibold">Speaker</p>
+          <p className="text-sm text-white/55">
+            {(progress?.xp ?? 0).toLocaleString()} XP · 🔥 {progress?.streak ?? 0} day streak
+          </p>
+        </div>
+      </div>
+
+      <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/60">
+        <p className="font-semibold text-white/80">Demo mode</p>
+        <p className="mt-1">
+          You&apos;re training with <span className="text-white/80">no account and no server</span>. Recordings are
+          analysed entirely on your device and your progress is saved in this browser.
+        </p>
+        <p className="mt-2">
+          Live transcription:{' '}
+          <span className={speech ? 'text-green-300' : 'text-amber-300'}>
+            {speech === null ? '…' : speech ? 'available in this browser ✓' : 'not available (try Chrome)'}
+          </span>
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        <Button asChild variant="secondary" className="h-12 w-full justify-between rounded-2xl bg-white/10 hover:bg-white/20">
+          <Link href="/train">
+            <span>🎯 Today&apos;s workout</span>
+            <span className="text-white/40">›</span>
+          </Link>
+        </Button>
+        <Button asChild variant="secondary" className="h-12 w-full justify-between rounded-2xl bg-white/10 hover:bg-white/20">
+          <Link href="/">
+            <span>ℹ️ About SmartSpeak</span>
+            <span className="text-white/40">›</span>
+          </Link>
+        </Button>
+
+        {!confirming ? (
+          <Button
+            onClick={() => setConfirming(true)}
+            variant="ghost"
+            className="h-12 w-full rounded-2xl text-red-400 hover:bg-red-500/10 hover:text-red-300"
+          >
+            Reset all progress
+          </Button>
+        ) : (
+          <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4">
+            <p className="text-sm text-white/80">Reset your streak, XP and history? This can&apos;t be undone.</p>
+            <div className="mt-3 flex gap-2">
+              <Button
+                onClick={() => {
+                  setProgress(resetProgress());
+                  setConfirming(false);
+                }}
+                className="flex-1 bg-red-500 hover:bg-red-400"
+              >
+                Reset
+              </Button>
+              <Button onClick={() => setConfirming(false)} variant="secondary" className="flex-1 bg-white/10 hover:bg-white/20">
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

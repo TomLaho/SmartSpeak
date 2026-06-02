@@ -1,8 +1,27 @@
 # SmartSpeak
 
-SmartSpeak is an AI-powered speech coaching MVP built with Next.js, Clerk, Stripe, Prisma (Postgres), Tailwind, and OpenAI. Users can record or upload practice audio, transcribe with Whisper, compute deterministic speech metrics, and receive structured coaching feedback via GPT-4o-mini. Free users get 3 lifetime sessions; paid users (Stripe subscription) get unlimited sessions.
+SmartSpeak is **Duolingo for public speaking** — short, daily, gamified workouts that make you a clearer, more captivating speaker. It trains two skills at once:
 
-## Features
+- **🎙️ Delivery** — the technical craft: pace, deliberate pauses, intonation, energy, and killing filler words.
+- **✨ Storytelling** — hooking fast, structuring a clear arc, explaining complex things simply, and making points land.
+
+There are two surfaces in this repo:
+
+1. **The Trainer (`/train`)** — a mobile-first, installable PWA with a Duolingo-style path of ~5-minute exercises, streaks, XP and a daily goal. It runs **fully in the browser with zero backend** ("demo mode"): recordings are analysed on-device with the Web Audio API (real pace, pause/silence detection, energy dynamics and pitch/intonation tracking), transcription uses the browser Speech Recognition API, coaching is computed locally, and progress is saved to `localStorage`.
+2. **The Cloud app (`/app`)** — the original authenticated MVP (Next.js, Clerk, Stripe, Prisma/Postgres, S3, OpenAI Whisper + GPT-4o-mini) for recording/uploading longer sessions with server-side transcription and LLM feedback.
+
+## Quick start — the Trainer (no backend, no keys)
+
+```
+pnpm install
+pnpm dev
+```
+
+Open http://localhost:3000/train in **Chrome** (best Speech Recognition support) and start a workout. No environment variables required. Allow microphone access when prompted.
+
+> Delivery metrics (pace, pauses, intonation, energy) work in any modern browser. Live transcription — and therefore storytelling feedback — needs the Web Speech API (Chrome/Edge); in other browsers you can type what you said to get storytelling scores.
+
+## Cloud app features
 - Record or upload 2–5 minute practice sessions with in-browser recording
 - Whisper-based transcription (server-side)
 - Deterministic speech metrics: WPM, fillers, pauses, structure proxies, SmartSpeak score
@@ -11,6 +30,8 @@ SmartSpeak is an AI-powered speech coaching MVP built with Next.js, Clerk, Strip
 - Paywall enforcement (free: 3 lifetime sessions; pro: unlimited) with Stripe Checkout + webhook handling
 - Private audio storage on S3-compatible buckets (Cloudflare R2 recommended) using presigned URLs
 - Optional background analysis worker via BullMQ + Redis
+
+> The cloud app under `/app` requires Clerk to be configured (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`). When Clerk keys are absent the app boots in demo mode and only the `/train` trainer is active.
 
 ## Getting Started
 ### Prerequisites
@@ -81,10 +102,18 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 - The UI provides clear states for uploading, transcribing, editing, and analyzing.
 
 ## Project Structure
-- `app/` Next.js App Router pages and API routes
+- `app/train/` the mobile-first PWA trainer (home path, exercise player, progress, profile)
+- `app/app/` the authenticated cloud app (dashboard, practice, history, sessions, billing)
+- `app/` shared landing, manifest, icon, and API routes
+- `components/train/` trainer UI (tab bar, score rings, etc.)
+- `components/ui/` shadcn-inspired UI primitives
+- `lib/exercises.ts` the exercise curriculum (Delivery + Storytelling tracks)
+- `lib/audio-analysis.ts` on-device Web Audio analysis (pace, pauses, energy, pitch)
+- `lib/speech-recognition.ts` browser Speech Recognition wrapper
+- `lib/coach.ts` deterministic, on-device delivery + storytelling scoring
+- `lib/local-store.ts` zero-backend progress/streak/XP store (`localStorage`)
 - `lib/` shared utilities (db, storage, stripe, openai, metrics)
 - `prisma/` schema and seed
-- `components/ui/` shadcn-inspired UI primitives
 - `worker/` optional BullMQ worker for background analysis
 
 ## Testing

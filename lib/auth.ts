@@ -1,4 +1,4 @@
-import { currentUser } from '@clerk/nextjs';
+import { currentUser } from '@clerk/nextjs/server';
 import { prisma } from './db';
 import { Plan } from '@prisma/client';
 

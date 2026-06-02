@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { getOrCreateUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { fetchObjectStream } from '@/lib/storage';
-import { openai, TRANSCRIBE_MODEL } from '@/lib/openai';
+import { getOpenAI, TRANSCRIBE_MODEL } from '@/lib/openai';
 import { canUseSession } from '@/lib/plan';
 import { rateLimit } from '@/lib/rate-limit';
 import { SessionStatus } from '@prisma/client';
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     const stream = await fetchObjectStream(session.audioKey);
     const audioBuffer = await streamToBuffer(stream);
 
-    const transcriptResponse = await openai.audio.transcriptions.create({
+    const transcriptResponse = await getOpenAI().audio.transcriptions.create({
       file: new File([audioBuffer], 'audio.wav'),
       model: TRANSCRIBE_MODEL,
       response_format: 'text',

@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import Link from 'next/link';
-import { currentUser, UserButton } from '@clerk/nextjs';
+import { UserButton } from '@clerk/nextjs';
+import { currentUser } from '@clerk/nextjs/server';
 import { siteConfig } from '@/lib/site';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
