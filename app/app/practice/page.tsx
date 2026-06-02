@@ -250,7 +250,7 @@ export default function PracticePage() {
             <div className="rounded-lg border p-4">
               <p className="text-sm font-semibold">Progress</p>
               <ol className="mt-2 space-y-2 text-sm">
-                <li className={step !== 'idle' ? 'text-foreground' : 'text-muted-foreground'}>1) Uploading</li>
+                <li className="text-foreground">1) Uploading</li>
                 <li className={['transcribing', 'editing', 'analyzing', 'done'].includes(step) ? 'text-foreground' : 'text-muted-foreground'}>
                   2) Transcribing
                 </li>

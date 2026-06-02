@@ -1,0 +1,297 @@
+'use client';
+
+import type { AudioMetrics } from './audio-analysis';
+import { DIMENSION_LABELS, type Dimension, type Exercise } from './exercises';
+
+/**
+ * Deterministic, on-device coaching.
+ *
+ * Turns audio metrics + the transcript into per-dimension scores and concrete,
+ * human feedback — with zero backend. Delivery dimensions come from the real
+ * audio analysis; storytelling dimensions come from transcript heuristics.
+ *
+ * (In the cloud build this is where an LLM pass would be layered on top; the
+ * heuristic scores make a great, cheap prompt scaffold.)
+ */
+
+export interface DimensionScore {
+  dimension: Dimension;
+  label: string;
+  score: number; // 0-100
+  detail: string;
+  measured: boolean; // false when we lacked data (e.g. no transcript)
+}
+
+export interface CoachResult {
+  overallScore: number;
+  scores: DimensionScore[];
+  strengths: string[];
+  improvements: string[];
+  quickWin: string;
+  wordCount: number;
+  xpEarned: number;
+}
+
+const FILLERS = ['um', 'uh', 'er', 'ah', 'like', 'you know', 'so', 'actually', 'basically', 'literally', 'kind of', 'sort of', 'i mean'];
+const VAGUE = ['thing', 'things', 'stuff', 'nice', 'good', 'bad', 'very', 'really', 'a lot', 'kind of', 'sort of', 'somehow', 'whatever', 'etc'];
+const SENSORY = ['saw', 'heard', 'felt', 'smell', 'loud', 'quiet', 'bright', 'dark', 'cold', 'warm', 'red', 'blue', 'rough', 'smooth', 'tiny', 'huge'];
+const SIGNPOSTS = ['first', 'second', 'third', 'next', 'then', 'finally', 'after', 'before', 'meanwhile', 'in conclusion', 'to summarize', 'in the end'];
+const TURNING = ['but', 'suddenly', 'until', 'however', 'because', 'so that', 'realized', 'turned out', 'that is when', "that's when"];
+const WEAK_OPENERS = ['so ', 'um ', 'uh ', 'well ', 'ok ', 'okay ', 'basically ', 'today i', 'i want to talk', 'i am going to', "i'm going to", 'this is about'];
+
+function tokenize(text: string): string[] {
+  return text.toLowerCase().replace(/[^a-z0-9\s']/g, ' ').split(/\s+/).filter(Boolean);
+}
+
+function sentences(text: string): string[] {
+  return text
+    .replace(/([.!?])+/g, '$1|')
+    .split('|')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+function countOccurrences(haystack: string, needles: string[]): number {
+  let n = 0;
+  for (const needle of needles) {
+    const re = new RegExp(`(^|[^a-z])${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z]|$)`, 'g');
+    n += (haystack.match(re) || []).length;
+  }
+  return n;
+}
+
+/** Triangular score: 100 at `ideal`, falling to ~0 at `ideal ± span`. */
+function bell(value: number, ideal: number, span: number): number {
+  const score = 100 - (Math.abs(value - ideal) / span) * 100;
+  return clamp(score);
+}
+
+function clamp(n: number, lo = 0, hi = 100): number {
+  return Math.max(lo, Math.min(hi, Math.round(n)));
+}
+
+// ─────────────────────────── Delivery scorers ───────────────────────────
+
+function scorePace(audio: AudioMetrics): DimensionScore {
+  const wpm = audio.articulationWpm ?? audio.wpm;
+  if (!wpm) {
+    return dim('pace', 70, 'Add a transcript to measure your speaking pace precisely.', false);
+  }
+  const score = bell(wpm, 145, 75);
+  let detail: string;
+  if (wpm < 110) detail = `~${wpm} wpm — a touch slow. A little more momentum will keep energy up.`;
+  else if (wpm > 185) detail = `~${wpm} wpm — quite fast. Slow down ~10% so each idea can land.`;
+  else detail = `~${wpm} wpm — right in the confident, easy-to-follow zone.`;
+  return dim('pace', score, detail, true);
+}
+
+function scorePauses(audio: AudioMetrics): DimensionScore {
+  if (audio.unavailable) return dim('pauses', 70, 'Pause analysis needs the audio recording.', false);
+  const ppm = audio.pausesPerMin;
+  const score = bell(ppm, 9, 9);
+  let detail: string;
+  if (ppm < 3) detail = `Only ${audio.pauseCount} clear pause(s). Build in silence before key points.`;
+  else if (ppm > 18) detail = `Lots of pausing (${ppm}/min). Some hesitation — try shorter, more deliberate breaks.`;
+  else detail = `${audio.pauseCount} well-placed pauses. Nice use of silence to shape your delivery.`;
+  if (audio.longPauseCount >= 3) detail += ` (${audio.longPauseCount} long gaps — keep them intentional.)`;
+  return dim('pauses', score, detail, true);
+}
+
+function scoreIntonation(audio: AudioMetrics): DimensionScore {
+  if (audio.unavailable || audio.pitch.voicedRatio < 0.15) {
+    return dim('intonation', 65, "Couldn't track pitch clearly — record somewhere quiet for this one.", false);
+  }
+  const v = audio.pitch.variationSemitones;
+  // Monotone ≈ <1.5 st; expressive ≈ 2.5-6 st.
+  const score = v < 1.5 ? clamp(v / 1.5 * 55) : clamp(55 + bell(v, 4, 4) * 0.45);
+  let detail: string;
+  if (v < 1.5) detail = `Fairly monotone (${v} semitones of pitch movement). Let your voice rise and fall more.`;
+  else if (v > 8) detail = `Very animated pitch (${v} semitones). Great energy — just keep it controlled.`;
+  else detail = `Lively intonation (${v} semitones of variation). Your voice carries the meaning well.`;
+  return dim('intonation', score, detail, true);
+}
+
+function scoreEnergy(audio: AudioMetrics): DimensionScore {
+  if (audio.unavailable) return dim('energy', 70, 'Volume dynamics need the audio recording.', false);
+  const range = audio.energy.dynamicRangeDb;
+  const score = range < 5 ? clamp(range / 5 * 55) : clamp(55 + bell(range, 13, 12) * 0.45);
+  const detail =
+    range < 5
+      ? `Flat volume (${range} dB range). Push key words louder and pull back elsewhere.`
+      : `Good vocal dynamics (${range} dB range) — you vary loudness to keep attention.`;
+  return dim('energy', score, detail, true);
+}
+
+function scoreFillers(text: string, words: number): DimensionScore {
+  if (words < 5) return dim('fillers', 70, 'Speak a little more to measure filler words.', false);
+  const fillerCount = countOccurrences(' ' + text.toLowerCase() + ' ', FILLERS);
+  const per100 = (fillerCount / words) * 100;
+  const score = clamp(100 - per100 * 9);
+  const detail =
+    fillerCount === 0
+      ? 'Zero filler words detected — crisp and clean.'
+      : `${fillerCount} filler word(s) (${per100.toFixed(1)} per 100 words). Replace them with a silent breath.`;
+  return dim('fillers', score, detail, true);
+}
+
+// ───────────────────────── Storytelling scorers ─────────────────────────
+
+function scoreHook(text: string): DimensionScore {
+  const sents = sentences(text);
+  if (sents.length === 0) return dim('hook', 50, 'No transcript to evaluate your opening.', false);
+  const opener = sents[0].toLowerCase();
+  let score = 55;
+  const reasons: string[] = [];
+
+  if (WEAK_OPENERS.some((w) => opener.startsWith(w.trim()) || opener.startsWith(w))) {
+    score -= 20;
+    reasons.push('it starts with throat-clearing');
+  }
+  if (/\?$/.test(sents[0].trim())) {
+    score += 18;
+    reasons.push('opens with a question');
+  }
+  if (/\d/.test(opener)) {
+    score += 12;
+    reasons.push('uses a concrete number');
+  }
+  if (/\b(you|your|imagine|picture)\b/.test(opener)) {
+    score += 12;
+    reasons.push('speaks directly to the listener');
+  }
+  const openerWords = tokenize(sents[0]).length;
+  if (openerWords <= 14 && openerWords >= 3) score += 8; // punchy
+  if (openerWords > 35) {
+    score -= 12;
+    reasons.push('the first sentence runs long');
+  }
+
+  const detail = reasons.length
+    ? `Your opening ${reasons.join(', ')}.`
+    : 'A solid opening — sharpen it with a question, a number, or a vivid image.';
+  return dim('hook', clamp(score), detail, true);
+}
+
+function scoreStructure(text: string, exercise: Exercise): DimensionScore {
+  const sents = sentences(text);
+  const lower = ' ' + text.toLowerCase() + ' ';
+  if (sents.length < 2) return dim('structure', 50, 'Too short to show a clear structure.', sents.length > 0);
+  const signposts = countOccurrences(lower, SIGNPOSTS);
+  const turning = countOccurrences(lower, TURNING);
+  let score = 50 + Math.min(30, signposts * 10) + Math.min(20, turning * 7);
+  // Story exercises specifically want a turning point.
+  if (exercise.type === 'story' && turning === 0) {
+    score -= 15;
+  }
+  const detail =
+    signposts + turning === 0
+      ? 'Hard to follow the thread — add signposts ("first", "then", "but", "finally").'
+      : `Clear progression (${signposts} signpost(s), ${turning} turning point(s)). The thread is easy to follow.`;
+  return dim('structure', clamp(score), detail, true);
+}
+
+function scoreClarity(text: string): DimensionScore {
+  const words = tokenize(text);
+  const sents = sentences(text);
+  if (words.length < 5 || sents.length === 0) return dim('clarity', 70, 'Speak a little more to measure clarity.', false);
+  const avgLen = words.length / sents.length;
+  const longWords = words.filter((w) => w.length > 9).length;
+  const complexRatio = longWords / words.length;
+  // Reward ~10-18 word sentences and few long words.
+  const lengthScore = bell(avgLen, 14, 12);
+  const simpleScore = clamp(100 - complexRatio * 220);
+  const score = clamp(lengthScore * 0.55 + simpleScore * 0.45);
+  let detail: string;
+  if (avgLen > 24) detail = `Long sentences (~${avgLen.toFixed(0)} words). Break them up so each idea is easy to hold.`;
+  else if (complexRatio > 0.18) detail = 'Some heavy vocabulary — swap a few long words for everyday ones.';
+  else detail = `Clear and easy to follow (~${avgLen.toFixed(0)} words/sentence, plain language).`;
+  return dim('clarity', score, detail, true);
+}
+
+function scoreConcreteness(text: string): DimensionScore {
+  const words = tokenize(text);
+  if (words.length < 5) return dim('concreteness', 70, 'Speak a little more to measure specificity.', false);
+  const lower = ' ' + text.toLowerCase() + ' ';
+  const vague = countOccurrences(lower, VAGUE);
+  const numbers = (text.match(/\d+/g) || []).length;
+  const sensory = countOccurrences(lower, SENSORY);
+  const vaguePer100 = (vague / words.length) * 100;
+  const specificPer100 = ((numbers + sensory) / words.length) * 100;
+  const score = clamp(60 - vaguePer100 * 6 + specificPer100 * 10);
+  const detail =
+    vaguePer100 > 4
+      ? `Several vague words (${vague}). Trade "thing/stuff/nice" for specific names, numbers, and senses.`
+      : numbers + sensory > 0
+      ? `Nicely concrete — ${numbers} number(s) and ${sensory} sensory detail(s) make it vivid.`
+      : 'Add a specific detail — a name, a number, a sound — to make it memorable.';
+  return dim('concreteness', score, detail, true);
+}
+
+function dim(dimension: Dimension, score: number, detail: string, measured: boolean): DimensionScore {
+  return { dimension, label: DIMENSION_LABELS[dimension], score: clamp(score), detail, measured };
+}
+
+// ─────────────────────────────── Compose ───────────────────────────────
+
+export function coachAttempt(
+  exercise: Exercise,
+  transcript: string,
+  audio: AudioMetrics
+): CoachResult {
+  const text = transcript.trim();
+  const words = tokenize(text);
+  const wordCount = words.length;
+
+  const all: Record<Dimension, () => DimensionScore> = {
+    pace: () => scorePace(audio),
+    pauses: () => scorePauses(audio),
+    intonation: () => scoreIntonation(audio),
+    energy: () => scoreEnergy(audio),
+    fillers: () => scoreFillers(text, wordCount),
+    hook: () => scoreHook(text),
+    structure: () => scoreStructure(text, exercise),
+    clarity: () => scoreClarity(text),
+    concreteness: () => scoreConcreteness(text),
+  };
+
+  // Score the exercise's focus dimensions first, then fill in the rest so the
+  // results screen always has a rounded picture.
+  const focus = exercise.focus;
+  const extras = (Object.keys(all) as Dimension[]).filter((d) => !focus.includes(d));
+  const scores = [...focus, ...extras].map((d) => all[d]());
+
+  // Overall = weighted toward the exercise's focus dimensions.
+  const focusScores = scores.filter((s) => focus.includes(s.dimension));
+  const measuredFocus = focusScores.filter((s) => s.measured);
+  const base = measuredFocus.length ? measuredFocus : focusScores;
+  const overallScore = clamp(base.reduce((a, s) => a + s.score, 0) / base.length);
+
+  const ranked = [...scores].filter((s) => s.measured).sort((a, b) => b.score - a.score);
+  const strengths = ranked.filter((s) => s.score >= 75).slice(0, 3).map((s) => s.detail);
+  const improvements = ranked.filter((s) => s.score < 70).reverse().slice(0, 3).map((s) => s.detail);
+
+  // Fallbacks so the screen is never empty.
+  if (strengths.length === 0 && ranked.length) strengths.push(ranked[0].detail);
+  const weakest = ranked.length ? ranked[ranked.length - 1] : focusScores[0];
+  const quickWin = weakest ? quickWinFor(weakest.dimension) : 'Record one more take and compare your scores.';
+
+  // XP: base reward scaled by performance, with a guaranteed floor for showing up.
+  const xpEarned = Math.round(exercise.xp * (0.6 + (overallScore / 100) * 0.6));
+
+  return { overallScore, scores, strengths, improvements, quickWin, wordCount, xpEarned };
+}
+
+function quickWinFor(d: Dimension): string {
+  const wins: Record<Dimension, string> = {
+    pace: 'Next take: pick the slowest comfortable pace. Slow almost always sounds more confident.',
+    pauses: 'Next take: take one full, silent second before your most important sentence.',
+    intonation: 'Next take: exaggerate your pitch on the emotional words. It will feel like too much — it isn\'t.',
+    energy: 'Next take: say your key word noticeably louder than the words around it.',
+    fillers: 'Next take: when you feel an "um" coming, close your mouth and breathe instead.',
+    hook: 'Next take: cut your first sentence and start with the second — drop us straight into the action.',
+    structure: 'Next take: plan three beats out loud first — beginning, turn, ending — then record.',
+    clarity: 'Next take: keep every sentence under ~15 words. One idea per sentence.',
+    concreteness: 'Next take: replace one vague word with a specific name, number, or sound.',
+  };
+  return wins[d];
+}

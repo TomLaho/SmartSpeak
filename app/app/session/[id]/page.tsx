@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { currentUser } from '@clerk/nextjs';
+import { currentUser } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
 import { createDownloadUrl } from '@/lib/storage';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';

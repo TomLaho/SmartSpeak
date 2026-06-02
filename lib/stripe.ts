@@ -3,7 +3,8 @@ import { prisma } from './db';
 import { Plan } from '@prisma/client';
 
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2024-06-20',
+  // Pin via cast so the app isn't coupled to the SDK's bundled apiVersion literal.
+  apiVersion: '2024-06-20' as Stripe.LatestApiVersion,
 });
 
 export async function syncSubscriptionToUser(params: {

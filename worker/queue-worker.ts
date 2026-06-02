@@ -1,14 +1,15 @@
 import 'dotenv/config';
-import { Queue, Worker, QueueScheduler, JobsOptions } from 'bullmq';
+import { Queue, Worker, JobsOptions } from 'bullmq';
 import { computeMetrics } from '../lib/metrics';
 import { prisma } from '../lib/db';
-import { openai, COACH_MODEL } from '../lib/openai';
+import { getOpenAI, COACH_MODEL } from '../lib/openai';
 import { SessionStatus } from '@prisma/client';
 
 const connection = { connection: { url: process.env.REDIS_URL || 'redis://localhost:6379' } };
 
 export const analysisQueue = new Queue('analysis', connection);
-new QueueScheduler('analysis', connection);
+// BullMQ v5 folded QueueScheduler's delayed/stalled-job handling into Worker,
+// so a separate scheduler is no longer needed.
 
 const worker = new Worker(
   'analysis',
@@ -19,7 +20,7 @@ const worker = new Worker(
 
     const metrics = computeMetrics(session.transcript, session.durationSeconds || undefined);
 
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAI().chat.completions.create({
       model: COACH_MODEL,
       messages: [
         { role: 'system', content: 'Provide concise JSON feedback for the transcript.' },

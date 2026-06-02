@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'crypto';
 import { getOrCreateUser } from '@/lib/auth';
 import { createUploadUrl } from '@/lib/storage';
 
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Storage not configured' }, { status: 500 });
     }
 
-    const key = `${user.id}/${uuid()}`;
+    const key = `${user.id}/${randomUUID()}`;
     const url = await createUploadUrl(key, contentType);
 
     return NextResponse.json({ url, key });
