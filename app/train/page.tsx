@@ -12,15 +12,18 @@ import {
   type TrackId,
 } from '@/lib/exercises';
 import { loadProgress, type Progress } from '@/lib/local-store';
+import { loadCalibration, isCalibrationNudgeDismissed, dismissCalibrationNudge } from '@/lib/calibration';
 import { Ring } from '@/components/train/ring';
 import { LogoMark } from '@/components/brand/logo';
 import { cn } from '@/lib/utils';
 
 export default function TrainHome() {
   const [progress, setProgress] = useState<Progress | null>(null);
+  const [showCalNudge, setShowCalNudge] = useState(false);
 
   useEffect(() => {
     setProgress(loadProgress());
+    setShowCalNudge(!loadCalibration() && !isCalibrationNudgeDismissed());
   }, []);
 
   const goalPct = progress ? Math.min(100, (progress.todayXp / DAILY_GOAL_XP) * 100) : 0;
@@ -59,6 +62,30 @@ export default function TrainHome() {
           <p className="mt-2 text-xs text-white/40">{(progress?.xp ?? 0).toLocaleString()} XP total</p>
         </div>
       </div>
+
+      {/* Mic calibration nudge (dismissible, one-time) */}
+      {showCalNudge && (
+        <div className="mb-5 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3.5">
+          <span className="text-lg">🎚️</span>
+          <p className="flex-1 text-sm text-white/70">Calibrate your mic (2s) for sharper, room-aware feedback.</p>
+          <Link
+            href="/train/profile"
+            className="shrink-0 rounded-full bg-violet-500 px-3 py-1.5 text-xs font-semibold"
+          >
+            Calibrate
+          </Link>
+          <button
+            onClick={() => {
+              dismissCalibrationNudge();
+              setShowCalNudge(false);
+            }}
+            aria-label="Dismiss"
+            className="shrink-0 px-1 text-white/30 hover:text-white/60"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Up next — primary action */}
       <Link

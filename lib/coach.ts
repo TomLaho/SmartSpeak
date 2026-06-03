@@ -124,11 +124,17 @@ function scoreIntonation(audio: AudioMetrics): DimensionScore {
 function scoreEnergy(audio: AudioMetrics): DimensionScore {
   if (audio.unavailable) return dim('energy', 70, 'Volume dynamics need the audio recording.', false);
   const range = audio.energy.dynamicRangeDb;
-  const score = range < 5 ? clamp(range / 5 * 55) : clamp(55 + bell(range, 13, 12) * 0.45);
-  const detail =
+  const score = range < 5 ? clamp((range / 5) * 55) : clamp(55 + bell(range, 13, 12) * 0.45);
+  let detail =
     range < 5
       ? `Flat volume (${range} dB range). Push key words louder and pull back elsewhere.`
       : `Good vocal dynamics (${range} dB range) — you vary loudness to keep attention.`;
+  // Relative to the user's calibrated speaking level, when available.
+  const vb = audio.energy.vsBaselineDb;
+  if (typeof vb === 'number') {
+    if (vb <= -4) detail += ` You were ~${Math.abs(vb)} dB under your usual level — project a little more.`;
+    else if (vb >= 4) detail += ` A touch above your usual level — strong presence.`;
+  }
   return dim('energy', score, detail, true);
 }
 
