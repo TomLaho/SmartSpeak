@@ -480,12 +480,18 @@ function ResultsView({
           <Bullets title="Focus areas" color="text-amber-300" items={result.improvements} />
         )}
 
-        {/* Quick audio stats */}
+        {/* Quick audio stats — all measured on-device from your recording */}
         {!metrics.unavailable && (
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <Stat label="Speaking" value={`${Math.round(metrics.speakingSec)}s`} />
-            <Stat label="Pauses" value={`${metrics.pauseCount}`} />
-            <Stat label="Pace" value={metrics.articulationWpm ? `${metrics.articulationWpm}` : '—'} sub="wpm" />
+          <div>
+            <div className="grid grid-cols-4 gap-2 text-center">
+              <Stat label="Speaking" value={`${Math.round(metrics.speakingSec)}s`} />
+              <Stat label="Pace" value={`${metrics.articulationWpm ?? metrics.estimatedWpm ?? '—'}`} sub="wpm" />
+              <Stat label="Pauses" value={`${metrics.pauseCount}`} />
+              <Stat label="Fillers" value={`${result.fillerCount}`} />
+            </div>
+            <p className="mt-2 text-center text-[11px] text-white/35">
+              🔒 Analysed from your audio on-device — tone, pace, pauses, volume &amp; fillers.
+            </p>
           </div>
         )}
 
