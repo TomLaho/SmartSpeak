@@ -256,8 +256,11 @@ function IntroView({
     <div className="flex flex-1 flex-col">
       <div className="flex-1 space-y-5 overflow-y-auto">
         <div>
-          <p className="text-sm text-white/50">
-            {exercise.type === 'read' ? 'Read aloud' : exercise.type === 'story' ? 'Tell a story' : 'Speak freely'} · ~
+          <span className="inline-block rounded-full bg-violet-500/15 px-2.5 py-0.5 text-xs font-semibold text-violet-300">
+            {exercise.scenario}
+          </span>
+          <p className="mt-2 text-sm text-white/50">
+            {exercise.type === 'read' ? 'Read aloud' : exercise.type === 'story' ? 'Walk it through' : 'Speak to the prompt'} · ~
             {exercise.targetSeconds}s
           </p>
           <h1 className="mt-1 text-3xl font-bold">{exercise.title}</h1>
@@ -307,7 +310,7 @@ function IntroView({
           <p className="rounded-xl bg-white/5 p-3 text-xs text-white/45">
             Heads up: live transcription isn&apos;t available in this browser (try Chrome). Your delivery — pace,
             pauses, intonation, energy — is still measured from the audio, and you can type what you said afterwards
-            for storytelling feedback.
+            for structure &amp; content feedback.
           </p>
         )}
       </div>
@@ -489,13 +492,13 @@ function ResultsView({
         {/* Transcript (editable for re-scoring) */}
         <div>
           <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-white/40">
-            Your words {editable && '(edit to re-score storytelling)'}
+            Your words {editable && '(edit to re-score structure & content)'}
           </p>
           <textarea
             value={transcript}
             onChange={(e) => setTranscript(e.target.value)}
             rows={4}
-            placeholder="No words captured — type what you said for storytelling feedback."
+            placeholder="No words captured — type what you said for structure & content feedback."
             className="w-full rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white/80 placeholder:text-white/25"
           />
           <Button onClick={onRescore} variant="secondary" size="sm" className="mt-2 bg-white/10 hover:bg-white/20">

@@ -6,18 +6,31 @@ import { isClerkConfigured } from '@/lib/clerk-config';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
-  title: `${siteConfig.name} | 5-minute speaking workouts`,
+  applicationName: siteConfig.name,
+  title: {
+    default: `${siteConfig.name} — Presentation coach for work`,
+    template: `%s · ${siteConfig.name}`,
+  },
   description: siteConfig.description,
+  keywords: [
+    'presentation skills',
+    'public speaking practice',
+    'present at work',
+    'pitch practice',
+    'executive presence',
+    'speaking coach',
+    'communication training',
+  ],
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'default',
+    statusBarStyle: 'black-translucent',
     title: siteConfig.name,
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: '#6d28d9',
+  themeColor: '#0b1020',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,

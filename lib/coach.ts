@@ -8,7 +8,8 @@ import { DIMENSION_LABELS, type Dimension, type Exercise } from './exercises';
  *
  * Turns audio metrics + the transcript into per-dimension scores and concrete,
  * human feedback — with zero backend. Delivery dimensions come from the real
- * audio analysis; storytelling dimensions come from transcript heuristics.
+ * audio analysis; structure & content dimensions come from transcript
+ * heuristics.
  *
  * (In the cloud build this is where an LLM pass would be layered on top; the
  * heuristic scores make a great, cheap prompt scaffold.)
@@ -134,7 +135,7 @@ function scoreFillers(text: string, words: number): DimensionScore {
   return dim('fillers', score, detail, true);
 }
 
-// ───────────────────────── Storytelling scorers ─────────────────────────
+// ────────────────────── Structure & content scorers ─────────────────────
 
 function scoreHook(text: string): DimensionScore {
   const sents = sentences(text);
@@ -220,10 +221,10 @@ function scoreConcreteness(text: string): DimensionScore {
   const score = clamp(60 - vaguePer100 * 6 + specificPer100 * 10);
   const detail =
     vaguePer100 > 4
-      ? `Several vague words (${vague}). Trade "thing/stuff/nice" for specific names, numbers, and senses.`
+      ? `Several vague words (${vague}). Trade "thing/stuff/nice" for specific numbers, names, and examples.`
       : numbers + sensory > 0
-      ? `Nicely concrete — ${numbers} number(s) and ${sensory} sensory detail(s) make it vivid.`
-      : 'Add a specific detail — a name, a number, a sound — to make it memorable.';
+      ? `Nicely concrete — ${numbers} number(s) and ${sensory} specific detail(s) make it credible.`
+      : 'Add a specific detail — a number, a name, an example — to make it land.';
   return dim('concreteness', score, detail, true);
 }
 
@@ -283,15 +284,15 @@ export function coachAttempt(
 
 function quickWinFor(d: Dimension): string {
   const wins: Record<Dimension, string> = {
-    pace: 'Next take: pick the slowest comfortable pace. Slow almost always sounds more confident.',
-    pauses: 'Next take: take one full, silent second before your most important sentence.',
-    intonation: 'Next take: exaggerate your pitch on the emotional words. It will feel like too much — it isn\'t.',
-    energy: 'Next take: say your key word noticeably louder than the words around it.',
+    pace: 'Next take: slow to your calmest pace. In a room, slower reads as more senior.',
+    pauses: 'Next take: take one full, silent second before your key number and before your ask.',
+    intonation: 'Next take: lift your pitch on the words that carry the meaning — the metric, the verb, the ask.',
+    energy: 'Next take: say your headline noticeably louder and slower than the words around it.',
     fillers: 'Next take: when you feel an "um" coming, close your mouth and breathe instead.',
-    hook: 'Next take: cut your first sentence and start with the second — drop us straight into the action.',
-    structure: 'Next take: plan three beats out loud first — beginning, turn, ending — then record.',
-    clarity: 'Next take: keep every sentence under ~15 words. One idea per sentence.',
-    concreteness: 'Next take: replace one vague word with a specific name, number, or sound.',
+    hook: 'Next take: open with your recommendation in one sentence, then back it up.',
+    structure: 'Next take: plan three beats first — point, evidence, so-what — then record.',
+    clarity: 'Next take: keep every sentence under ~15 words. One idea at a time.',
+    concreteness: 'Next take: swap one vague phrase for a specific number, name, or example.',
   };
   return wins[d];
 }

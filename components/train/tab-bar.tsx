@@ -2,12 +2,18 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { MicrophoneIcon, ChartBarIcon, UserCircleIcon } from '@heroicons/react/24/outline';
+import {
+  MicrophoneIcon as MicrophoneSolid,
+  ChartBarIcon as ChartBarSolid,
+  UserCircleIcon as UserCircleSolid,
+} from '@heroicons/react/24/solid';
 import { cn } from '@/lib/utils';
 
 const tabs = [
-  { href: '/train', label: 'Train', icon: '🎯' },
-  { href: '/train/progress', label: 'Progress', icon: '📈' },
-  { href: '/train/profile', label: 'Profile', icon: '👤' },
+  { href: '/train', label: 'Practice', Icon: MicrophoneIcon, IconActive: MicrophoneSolid },
+  { href: '/train/progress', label: 'Progress', Icon: ChartBarIcon, IconActive: ChartBarSolid },
+  { href: '/train/profile', label: 'Profile', Icon: UserCircleIcon, IconActive: UserCircleSolid },
 ];
 
 export function TabBar() {
@@ -19,16 +25,18 @@ export function TabBar() {
       <div className="mx-auto flex max-w-md items-stretch justify-around px-2 py-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))]">
         {tabs.map((tab) => {
           const active = tab.href === '/train' ? pathname === '/train' : pathname.startsWith(tab.href);
+          const Glyph = active ? tab.IconActive : tab.Icon;
           return (
             <Link
               key={tab.href}
               href={tab.href}
+              aria-current={active ? 'page' : undefined}
               className={cn(
                 'flex flex-1 flex-col items-center gap-0.5 rounded-xl py-1.5 text-[11px] font-medium transition-colors',
-                active ? 'text-white' : 'text-white/45 hover:text-white/70'
+                active ? 'text-violet-300' : 'text-white/45 hover:text-white/70'
               )}
             >
-              <span className={cn('text-xl transition-transform', active && 'scale-110')}>{tab.icon}</span>
+              <Glyph className={cn('h-6 w-6 transition-transform', active && 'scale-105')} />
               {tab.label}
             </Link>
           );

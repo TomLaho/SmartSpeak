@@ -1,13 +1,14 @@
 # SmartSpeak
 
-SmartSpeak is **Duolingo for public speaking** — short, daily, gamified workouts that make you a clearer, more captivating speaker. It trains two skills at once:
+SmartSpeak is a **pocket presentation coach for work** — short, daily, gamified reps that rehearse the meetings that move your career: reading out findings, walking a deck, pitching a strategy, defending an implementation plan, giving a status update, and handling tough questions. It trains three skills:
 
-- **🎙️ Delivery** — the technical craft: pace, deliberate pauses, intonation, energy, and killing filler words.
-- **✨ Storytelling** — hooking fast, structuring a clear arc, explaining complex things simply, and making points land.
+- **🎙️ Delivery** — the technical craft: pace, deliberate pauses before your key numbers, vocal emphasis, energy, and killing filler words.
+- **🧩 Structure** — leading with the point (BLUF), turning data into a clear "so what", walking a deck as one connected story, and making one idea land.
+- **🤝 Influence & Q&A** — the 60-second executive summary, a confident ask, and staying composed and answer-first when your plan gets challenged.
 
 There are two surfaces in this repo:
 
-1. **The Trainer (`/train`)** — a mobile-first, installable PWA with a Duolingo-style path of ~5-minute exercises, streaks, XP and a daily goal. It runs **fully in the browser with zero backend** ("demo mode"): recordings are analysed on-device with the Web Audio API (real pace, pause/silence detection, energy dynamics and pitch/intonation tracking), transcription uses the browser Speech Recognition API, coaching is computed locally, and progress is saved to `localStorage`.
+1. **The Trainer (`/train`)** — a mobile-first, installable PWA with a path of ~1-minute, work-scenario exercises, streaks, XP and a daily goal. It runs **fully in the browser with zero backend**: recordings are analysed on-device with the Web Audio API (real pace, pause/silence detection, energy dynamics and pitch/intonation tracking), transcription uses the browser Speech Recognition API, coaching is computed locally, and progress is saved to `localStorage`. Your voice never leaves the device.
 2. **The Cloud app (`/app`)** — the original authenticated MVP (Next.js, Clerk, Stripe, Prisma/Postgres, S3, OpenAI Whisper + GPT-4o-mini) for recording/uploading longer sessions with server-side transcription and LLM feedback.
 
 ## Quick start — the Trainer (no backend, no keys)
@@ -17,9 +18,18 @@ pnpm install
 pnpm dev
 ```
 
-Open http://localhost:3000/train in **Chrome** (best Speech Recognition support) and start a workout. No environment variables required. Allow microphone access when prompted.
+Open http://localhost:3000/train in **Chrome** (best Speech Recognition support) and start a session. No environment variables required. Allow microphone access when prompted.
 
-> Delivery metrics (pace, pauses, intonation, energy) work in any modern browser. Live transcription — and therefore storytelling feedback — needs the Web Speech API (Chrome/Edge); in other browsers you can type what you said to get storytelling scores.
+> Delivery metrics (pace, pauses, intonation, energy) work in any modern browser. Live transcription — and therefore structure & content feedback — needs the Web Speech API (Chrome/Edge); in other browsers you can type what you said to get structure & content scores.
+
+## Android & the Play Store (TWA)
+
+The trainer is a standalone, installable PWA, which is the recommended on-ramp to the Google Play Store via a **Trusted Web Activity (TWA)** — no rewrite, no React Native.
+
+- **Manifest** (`app/manifest.ts`) is Play-ready: `standalone` display, portrait orientation, `productivity`/`education`/`business` categories, app shortcuts, and a dedicated **maskable** icon (`public/icon-maskable.svg`) with a safe zone for Android adaptive icons. The standard mark lives at `app/icon.svg` and is re-used in-app via `components/brand/logo.tsx`.
+- **Package it:** deploy the app over HTTPS, then run [PWABuilder](https://www.pwabuilder.com/) (or [Bubblewrap](https://github.com/GoogleChromeLabs/bubblewrap)) against the deployed URL. Both read this manifest, **rasterise the SVG icons into the required PNG set (192/512 + maskable)**, and emit a signed Android App Bundle (`.aab`) you can upload to the Play Console.
+- **Verify ownership:** add the generated `assetlinks.json` to `/.well-known/` so the TWA opens without a browser URL bar.
+- **Monetisation:** for a paid/subscription tier on Android, use Google Play Billing (the Play Billing/Digital Goods API works inside a TWA). The existing Stripe plumbing under `/app` is for the web build.
 
 ## Cloud app features
 - Record or upload 2–5 minute practice sessions with in-browser recording
@@ -107,10 +117,11 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 - `app/` shared landing, manifest, icon, and API routes
 - `components/train/` trainer UI (tab bar, score rings, etc.)
 - `components/ui/` shadcn-inspired UI primitives
-- `lib/exercises.ts` the exercise curriculum (Delivery + Storytelling tracks)
+- `lib/exercises.ts` the exercise curriculum (Delivery, Structure, Influence & Q&A paths)
 - `lib/audio-analysis.ts` on-device Web Audio analysis (pace, pauses, energy, pitch)
 - `lib/speech-recognition.ts` browser Speech Recognition wrapper
-- `lib/coach.ts` deterministic, on-device delivery + storytelling scoring
+- `lib/coach.ts` deterministic, on-device delivery + structure/content scoring
+- `components/brand/logo.tsx` the in-app brand mark (matches the installed app icon)
 - `lib/local-store.ts` zero-backend progress/streak/XP store (`localStorage`)
 - `lib/` shared utilities (db, storage, stripe, openai, metrics)
 - `prisma/` schema and seed
