@@ -30,10 +30,15 @@ export interface CoachResult {
   improvements: string[];
   quickWin: string;
   wordCount: number;
+  /** Combined acoustic hesitations + lexical fillers. */
+  fillerCount: number;
   xpEarned: number;
 }
 
-const FILLERS = ['um', 'uh', 'er', 'ah', 'like', 'you know', 'so', 'actually', 'basically', 'literally', 'kind of', 'sort of', 'i mean'];
+// Non-vocalised fillers we can only catch in the transcript. The vocalised
+// ones ("um/uh/er/ah") are detected acoustically in lib/audio-analysis.ts, so
+// they're intentionally excluded here to avoid double-counting.
+const LEXICAL_FILLERS = ['like', 'you know', 'so', 'actually', 'basically', 'literally', 'kind of', 'sort of', 'i mean', 'right', 'i guess'];
 const VAGUE = ['thing', 'things', 'stuff', 'nice', 'good', 'bad', 'very', 'really', 'a lot', 'kind of', 'sort of', 'somehow', 'whatever', 'etc'];
 const SENSORY = ['saw', 'heard', 'felt', 'smell', 'loud', 'quiet', 'bright', 'dark', 'cold', 'warm', 'red', 'blue', 'rough', 'smooth', 'tiny', 'huge'];
 const SIGNPOSTS = ['first', 'second', 'third', 'next', 'then', 'finally', 'after', 'before', 'meanwhile', 'in conclusion', 'to summarize', 'in the end'];
@@ -74,15 +79,19 @@ function clamp(n: number, lo = 0, hi = 100): number {
 // ─────────────────────────── Delivery scorers ───────────────────────────
 
 function scorePace(audio: AudioMetrics): DimensionScore {
-  const wpm = audio.articulationWpm ?? audio.wpm;
+  // Prefer exact word-based pace when a transcript is available; otherwise use
+  // the transcript-free estimate derived from the audio's syllable rate.
+  const exact = audio.articulationWpm ?? audio.wpm;
+  const wpm = exact ?? audio.estimatedWpm;
   if (!wpm) {
-    return dim('pace', 70, 'Add a transcript to measure your speaking pace precisely.', false);
+    return dim('pace', 70, 'Speak a little longer so we can measure your pace from the audio.', false);
   }
+  const src = exact ? '' : ' (estimated from your audio)';
   const score = bell(wpm, 145, 75);
   let detail: string;
-  if (wpm < 110) detail = `~${wpm} wpm — a touch slow. A little more momentum will keep energy up.`;
-  else if (wpm > 185) detail = `~${wpm} wpm — quite fast. Slow down ~10% so each idea can land.`;
-  else detail = `~${wpm} wpm — right in the confident, easy-to-follow zone.`;
+  if (wpm < 110) detail = `~${wpm} wpm${src} — a touch slow. A little more momentum keeps the energy up.`;
+  else if (wpm > 185) detail = `~${wpm} wpm${src} — quite fast. Slow down ~10% so each point can land.`;
+  else detail = `~${wpm} wpm${src} — right in the confident, easy-to-follow zone.`;
   return dim('pace', score, detail, true);
 }
 
@@ -123,15 +132,30 @@ function scoreEnergy(audio: AudioMetrics): DimensionScore {
   return dim('energy', score, detail, true);
 }
 
-function scoreFillers(text: string, words: number): DimensionScore {
-  if (words < 5) return dim('fillers', 70, 'Speak a little more to measure filler words.', false);
-  const fillerCount = countOccurrences(' ' + text.toLowerCase() + ' ', FILLERS);
-  const per100 = (fillerCount / words) * 100;
-  const score = clamp(100 - per100 * 9);
-  const detail =
-    fillerCount === 0
-      ? 'Zero filler words detected — crisp and clean.'
-      : `${fillerCount} filler word(s) (${per100.toFixed(1)} per 100 words). Replace them with a silent breath.`;
+function scoreFillers(text: string, words: number, audio: AudioMetrics): DimensionScore {
+  // Acoustic "uh/um" hesitations come straight from the audio; lexical fillers
+  // ("like", "you know", …) come from the transcript when we have one.
+  const lexical = words >= 5 ? countOccurrences(' ' + text.toLowerCase() + ' ', LEXICAL_FILLERS) : 0;
+  const acoustic = audio.unavailable ? 0 : audio.filledPauseCount;
+  const total = lexical + acoustic;
+
+  const speakingMin = audio.speakingSec > 0 ? audio.speakingSec / 60 : 0;
+  if (!speakingMin && words < 5) {
+    return dim('fillers', 70, 'Speak a little more to measure filler words.', false);
+  }
+  // Rate per minute of speaking time so it works with or without a transcript.
+  const perMin = speakingMin ? total / speakingMin : (total / Math.max(1, words)) * 130;
+  const score = clamp(100 - perMin * 6);
+
+  let detail: string;
+  if (total === 0) {
+    detail = 'No fillers or hesitations detected — crisp and clean.';
+  } else {
+    const parts: string[] = [];
+    if (acoustic) parts.push(`${acoustic} "uh/um" hesitation${acoustic === 1 ? '' : 's'}`);
+    if (lexical) parts.push(`${lexical} filler word${lexical === 1 ? '' : 's'}`);
+    detail = `${parts.join(' and ')} (~${perMin.toFixed(1)}/min). Replace each one with a silent breath.`;
+  }
   return dim('fillers', score, detail, true);
 }
 
@@ -243,12 +267,15 @@ export function coachAttempt(
   const words = tokenize(text);
   const wordCount = words.length;
 
+  const lexicalFillers = wordCount >= 5 ? countOccurrences(' ' + text.toLowerCase() + ' ', LEXICAL_FILLERS) : 0;
+  const fillerCount = lexicalFillers + (audio.unavailable ? 0 : audio.filledPauseCount);
+
   const all: Record<Dimension, () => DimensionScore> = {
     pace: () => scorePace(audio),
     pauses: () => scorePauses(audio),
     intonation: () => scoreIntonation(audio),
     energy: () => scoreEnergy(audio),
-    fillers: () => scoreFillers(text, wordCount),
+    fillers: () => scoreFillers(text, wordCount, audio),
     hook: () => scoreHook(text),
     structure: () => scoreStructure(text, exercise),
     clarity: () => scoreClarity(text),
@@ -279,7 +306,7 @@ export function coachAttempt(
   // XP: base reward scaled by performance, with a guaranteed floor for showing up.
   const xpEarned = Math.round(exercise.xp * (0.6 + (overallScore / 100) * 0.6));
 
-  return { overallScore, scores, strengths, improvements, quickWin, wordCount, xpEarned };
+  return { overallScore, scores, strengths, improvements, quickWin, wordCount, fillerCount, xpEarned };
 }
 
 function quickWinFor(d: Dimension): string {

@@ -35,7 +35,7 @@ export default function TrainHome() {
     <div className="px-5 pb-8 pt-5">
       {/* App bar */}
       <div className="mb-6 flex items-center justify-between">
-        <LogoMark size={30} className="rounded-[28%]" />
+        <LogoMark size={30} className="rounded-[22%]" />
         <div className="flex items-center gap-1.5 rounded-full bg-orange-500/15 px-3 py-1.5 text-orange-300">
           <span className="text-lg">🔥</span>
           <span className="font-bold">{progress?.streak ?? 0}</span>
