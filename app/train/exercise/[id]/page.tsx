@@ -7,6 +7,7 @@ import { getExercise } from '@/lib/exercises';
 import { analyzeAudioInWorker, type AudioMetrics } from '@/lib/audio-analysis';
 import { coachAttempt, type CoachResult } from '@/lib/coach';
 import { loadCalibration, toCalibrationInput } from '@/lib/calibration';
+import { transcribeOnDevice, isOnDeviceTranscriptionSupported, type TranscribeProgress } from '@/lib/transcribe';
 import { recordAttempt } from '@/lib/local-store';
 import { createTranscriber, isSpeechRecognitionSupported, type LiveTranscriber } from '@/lib/speech-recognition';
 import { Ring } from '@/components/train/ring';
@@ -33,6 +34,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [transcriptionState, setTranscriptionState] = useState<TranscriptionState>('idle');
   const [transcriptionDiag, setTranscriptionDiag] = useState<string | null>(null);
+  const [transcribeStatus, setTranscribeStatus] = useState<TranscribeProgress | null>(null);
 
   // Recording infra refs.
   const streamRef = useRef<MediaStream | null>(null);
@@ -69,20 +71,34 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     async (blob: Blob) => {
       if (!exercise) return;
       setPhase('analyzing');
-      const text = transcriptRef.current.trim();
+      let text = transcriptRef.current.trim();
+
+      // No live transcript (the norm on Android) → transcribe the recorded clip
+      // on-device. No mic contention, no upload, no backend.
+      if (!text && isOnDeviceTranscriptionSupported()) {
+        try {
+          setTranscribeStatus({ stage: 'loading' });
+          text = (await transcribeOnDevice(blob, (p) => setTranscribeStatus(p))).trim();
+          if (text) {
+            transcriptRef.current = text;
+            setTranscript(text);
+          }
+        } catch (err: any) {
+          sttDiagRef.current.error = sttDiagRef.current.error || `on-device transcription: ${err?.message ?? 'failed'}`;
+        } finally {
+          setTranscribeStatus(null);
+        }
+      }
+
       const wordCount = text ? text.split(/\s+/).filter(Boolean).length : undefined;
       if (!wordCount) {
         const d = sttDiagRef.current;
         setTranscriptionDiag(
-          !speechSupported
-            ? 'this browser has no speech recognition'
-            : d.error
-            ? `speech recognition error: ${d.error}`
-            : !d.audioStarted
-            ? 'the recorder is holding the mic, so speech recognition received no audio'
-            : !d.gotResult
-            ? 'speech recognition ran but returned no words'
-            : 'no words were captured'
+          d.error
+            ? `transcription error: ${d.error}`
+            : !isOnDeviceTranscriptionSupported()
+            ? 'this browser cannot run on-device transcription'
+            : 'we could not make out any speech in the recording'
         );
       } else {
         setTranscriptionDiag(null);
@@ -105,7 +121,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
       });
       setPhase('results');
     },
-    [exercise, speechSupported]
+    [exercise]
   );
 
   const startRecording = useCallback(async () => {
@@ -221,6 +237,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     transcriptRef.current = '';
     setTranscriptionState('idle');
     setTranscriptionDiag(null);
+    setTranscribeStatus(null);
     setPhase('intro');
   }, [cleanup]);
 
@@ -269,9 +286,26 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
       )}
 
       {phase === 'analyzing' && (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4">
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
           <div className="h-12 w-12 animate-spin rounded-full border-4 border-white/15 border-t-violet-500" />
-          <p className="text-white/60">Analysing your delivery…</p>
+          {transcribeStatus ? (
+            <div>
+              <p className="text-white/70">
+                {transcribeStatus.stage === 'loading'
+                  ? 'Setting up on-device transcription…'
+                  : 'Transcribing your words…'}
+              </p>
+              {transcribeStatus.stage === 'loading' && (
+                <p className="mt-1 text-xs text-white/40">
+                  One-time download of a small, private speech model
+                  {typeof transcribeStatus.percent === 'number' ? ` · ${transcribeStatus.percent}%` : ''} — cached after
+                  this.
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-white/60">Analysing your delivery…</p>
+          )}
         </div>
       )}
 

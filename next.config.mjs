@@ -11,6 +11,16 @@ const nextConfig = {
       { protocol: 'https', hostname: '**' },
       { protocol: 'http', hostname: '**' }
     ]
+  },
+  webpack: (config) => {
+    // Keep native-only deps of @xenova/transformers out of the browser/worker
+    // bundle; on-device ASR uses the WASM backend + remote (cached) models.
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      sharp$: false,
+      'onnxruntime-node$': false
+    };
+    return config;
   }
 };
 

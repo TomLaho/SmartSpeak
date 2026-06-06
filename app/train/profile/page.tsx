@@ -40,10 +40,8 @@ export default function ProfilePage() {
           analysed entirely on your device and never uploaded — your progress is saved privately in this browser.
         </p>
         <p className="mt-2">
-          Live transcription:{' '}
-          <span className={speech ? 'text-green-300' : 'text-amber-300'}>
-            {speech === null ? '…' : speech ? 'available in this browser ✓' : 'not available (try Chrome)'}
-          </span>
+          Transcription runs <span className="text-green-300">on-device</span> — your words are transcribed from the
+          recording locally{speech ? ', with live captions while you speak.' : ' (a small speech model downloads once, then works offline).'}
         </p>
       </div>
 

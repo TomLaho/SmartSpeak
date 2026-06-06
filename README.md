@@ -20,7 +20,7 @@ pnpm dev
 
 Open http://localhost:3000/train in **Chrome** (best Speech Recognition support) and start a session. No environment variables required. Allow microphone access when prompted.
 
-> Delivery metrics (pace, pauses, intonation, energy) work in any modern browser. Live transcription — and therefore structure & content feedback — needs the Web Speech API (Chrome/Edge); in other browsers you can type what you said to get structure & content scores.
+> Delivery metrics (pace, pauses, intonation, energy) are measured from your audio in any modern browser. Transcripts power the structure & content scores: live captions use the Web Speech API where it works (desktop Chrome/Edge), and otherwise SmartSpeak transcribes the **recording on-device** with Whisper (Transformers.js + WebAssembly) — a small model downloads once and is cached, and the audio never leaves the device. You can always edit the transcript to re-score. On Android the recorder and the live recognizer can't share the mic, so the on-device path is the reliable one there.
 
 ## Android & the Play Store (TWA)
 
