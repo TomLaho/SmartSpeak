@@ -40,6 +40,8 @@ export interface AudioMetrics {
     rangeSemitones: number;
     voicedRatio: number;
   };
+  /** Timestamped hesitations + long pauses for the self-review timeline. */
+  events: AudioEvent[];
   /** True when decoding/analysis failed and only transcript data is available. */
   unavailable?: boolean;
 }
@@ -48,6 +50,15 @@ export interface AudioMetrics {
 export interface CalibrationInput {
   noiseFloorRms: number;
   speakingRms?: number;
+}
+
+export type AudioEventType = 'filler' | 'pause';
+
+/** A timestamped delivery moment, used to mark up the self-review timeline. */
+export interface AudioEvent {
+  type: AudioEventType;
+  startSec: number;
+  endSec: number;
 }
 
 const FRAME_MS = 25; // analysis frame length
@@ -79,6 +90,7 @@ export const UNAVAILABLE_METRICS: AudioMetrics = {
   filledPausePerMin: 0,
   energy: { meanDb: -60, dynamicRangeDb: 0 },
   pitch: { medianHz: 0, variationSemitones: 0, rangeSemitones: 0, voicedRatio: 0 },
+  events: [],
   unavailable: true,
 };
 
@@ -191,12 +203,19 @@ export function analyzePcm(
   const segOf = new Int32Array(frameCount).fill(-1);
   let speakingFrames = 0;
   const pauseDurations: number[] = [];
+  const events: AudioEvent[] = [];
   let runSilent = 0;
   let segStart = -1;
   for (let f = 0; f < frameCount; f++) {
     if (rms[f] >= threshold) {
       if (segStart < 0) segStart = f;
-      if (runSilent * frameSec >= PAUSE_MIN_SEC) pauseDurations.push(runSilent * frameSec);
+      const pdur = runSilent * frameSec;
+      if (pdur >= PAUSE_MIN_SEC) {
+        pauseDurations.push(pdur);
+        if (pdur >= LONG_PAUSE_SEC) {
+          events.push({ type: 'pause', startSec: round((f - runSilent) * frameSec, 2), endSec: round(f * frameSec, 2) });
+        }
+      }
       runSilent = 0;
       speakingFrames++;
     } else {
@@ -320,9 +339,17 @@ export function analyzePcm(
     const segF0: number[] = [];
     for (let f = seg.start; f <= seg.end; f++) if (f0ByFrame[f] > 0) segF0.push(f0ByFrame[f]);
     if (segF0.length < 3) continue;
-    if (stdevSemitones(segF0) <= FILLER_MAX_SEMITONE_STD) filledPauseCount++;
+    if (stdevSemitones(segF0) <= FILLER_MAX_SEMITONE_STD) {
+      filledPauseCount++;
+      events.push({
+        type: 'filler',
+        startSec: round(seg.start * frameSec, 2),
+        endSec: round((seg.end + 1) * frameSec, 2),
+      });
+    }
   }
   const filledPausePerMin = durationSec ? (filledPauseCount / durationSec) * 60 : 0;
+  events.sort((a, b) => a.startSec - b.startSec);
 
   const wpm = wordCount && durationSec ? (wordCount / durationSec) * 60 : undefined;
   const articulationWpm = wordCount && speakingSec > 1 ? (wordCount / speakingSec) * 60 : undefined;
@@ -349,6 +376,7 @@ export function analyzePcm(
       rangeSemitones: round(rangeSemitones, 1),
       voicedRatio: round(voicedRatio, 2),
     },
+    events,
   };
 }
 

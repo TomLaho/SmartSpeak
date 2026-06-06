@@ -10,10 +10,13 @@ import { loadCalibration, toCalibrationInput } from '@/lib/calibration';
 import { recordAttempt } from '@/lib/local-store';
 import { createTranscriber, isSpeechRecognitionSupported, type LiveTranscriber } from '@/lib/speech-recognition';
 import { Ring } from '@/components/train/ring';
+import { DeliveryTimeline } from '@/components/train/delivery-timeline';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import type { Exercise } from '@/lib/exercises';
 
 type Phase = 'intro' | 'recording' | 'analyzing' | 'results';
+type TranscriptionState = 'idle' | 'listening' | 'unavailable' | 'unsupported';
 
 export default function ExercisePlayer({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -28,6 +31,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
   const [result, setResult] = useState<CoachResult | null>(null);
   const [reward, setReward] = useState<{ streakIncreased: boolean; goalReached: boolean; streak: number } | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [transcriptionState, setTranscriptionState] = useState<TranscriptionState>('idle');
 
   // Recording infra refs.
   const streamRef = useRef<MediaStream | null>(null);
@@ -88,6 +92,26 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     transcriptRef.current = '';
     setSeconds(0);
     chunksRef.current = [];
+    setTranscriptionState(speechSupported ? 'listening' : 'unsupported');
+
+    // Start live transcription *synchronously* inside the tap handler. Android
+    // Chrome blocks SpeechRecognition.start() once the user gesture is consumed
+    // by `await getUserMedia`, which is why transcription previously never ran.
+    const transcriber = createTranscriber({
+      onTranscript: (text) => {
+        transcriptRef.current = text;
+        setTranscript(text);
+        if (text) setTranscriptionState('listening');
+      },
+      onError: (e) => {
+        if (['not-allowed', 'service-not-allowed', 'network', 'language-not-supported'].includes(e)) {
+          setTranscriptionState('unavailable');
+        }
+      },
+    });
+    transcriberRef.current = transcriber;
+    transcriber?.start();
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -124,23 +148,15 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
       };
       tick();
 
-      // Live transcription (best-effort)
-      const transcriber = createTranscriber({
-        onTranscript: (text) => {
-          transcriptRef.current = text;
-          setTranscript(text);
-        },
-      });
-      transcriberRef.current = transcriber;
-      transcriber?.start();
-
       timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
       setPhase('recording');
     } catch (err) {
       console.error(err);
+      transcriber?.stop();
+      transcriberRef.current = null;
       setError('Microphone access is required. Please allow it and try again.');
     }
-  }, [finishAnalysis]);
+  }, [finishAnalysis, speechSupported]);
 
   const stopRecording = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -172,6 +188,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     setAudioUrl(null);
     setTranscript('');
     transcriptRef.current = '';
+    setTranscriptionState('idle');
     setPhase('intro');
   }, [cleanup]);
 
@@ -207,9 +224,11 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
 
       {phase === 'recording' && (
         <RecordingView
+          exercise={exercise}
           seconds={seconds}
           level={level}
           transcript={transcript}
+          transcriptionState={transcriptionState}
           targetPct={targetPct}
           reachedTarget={reachedTarget}
           targetSeconds={exercise.targetSeconds}
@@ -229,6 +248,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
           result={result}
           metrics={metrics}
           reward={reward}
+          audioUrl={audioUrl}
           transcript={transcript}
           setTranscript={setTranscript}
           onRescore={rescore}
@@ -329,62 +349,93 @@ function IntroView({
 // ───────────────────────────── Recording ─────────────────────────────
 
 function RecordingView({
+  exercise,
   seconds,
   level,
   transcript,
+  transcriptionState,
   targetPct,
   reachedTarget,
   targetSeconds,
   onStop,
 }: {
+  exercise: Exercise;
   seconds: number;
   level: number;
   transcript: string;
+  transcriptionState: TranscriptionState;
   targetPct: number;
   reachedTarget: boolean;
   targetSeconds: number;
   onStop: () => void;
 }) {
   const mmss = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  const transcriptUnavailable = transcriptionState === 'unavailable' || transcriptionState === 'unsupported';
   return (
-    <div className="flex flex-1 flex-col items-center">
-      <div className="mt-2">
-        <Ring value={targetPct} size={220} stroke={12} color={reachedTarget ? '#22c55e' : '#7c3aed'}>
-          <span className="text-5xl font-bold tabular-nums">{mmss}</span>
-          <span className="mt-1 text-xs text-white/45">
-            {reachedTarget ? 'Target reached — wrap up anytime' : `target ~${targetSeconds}s`}
+    <div className="flex flex-1 flex-col">
+      {/* Compact timer + live level meter */}
+      <div className="flex shrink-0 flex-col items-center">
+        <Ring value={targetPct} size={132} stroke={10} color={reachedTarget ? '#22c55e' : '#7c3aed'}>
+          <span className="text-3xl font-bold tabular-nums">{mmss}</span>
+          <span className="mt-0.5 text-[10px] text-white/45">
+            {reachedTarget ? 'wrap up anytime' : `target ~${targetSeconds}s`}
           </span>
         </Ring>
+        <div className="mt-3 flex h-8 items-end gap-1">
+          {Array.from({ length: 9 }).map((_, i) => {
+            const threshold = (i + 1) / 9;
+            const active = level >= threshold * 0.9 || Math.random() < level * 0.4;
+            return (
+              <span
+                key={i}
+                className={cn('w-2 rounded-full transition-all', active ? 'bg-violet-400' : 'bg-white/10')}
+                style={{ height: `${10 + (active ? level * 28 : 4)}px` }}
+              />
+            );
+          })}
+        </div>
       </div>
 
-      {/* Live level meter */}
-      <div className="mt-8 flex h-16 items-end gap-1">
-        {Array.from({ length: 9 }).map((_, i) => {
-          const threshold = (i + 1) / 9;
-          const active = level >= threshold * 0.9 || Math.random() < level * 0.4;
-          return (
-            <span
-              key={i}
-              className={cn('w-2 rounded-full transition-all', active ? 'bg-violet-400' : 'bg-white/10')}
-              style={{ height: `${20 + (active ? level * 44 : 6)}px` }}
-            />
-          );
-        })}
-      </div>
+      {/* Keep the task in view while recording (essential for read-aloud drills). */}
+      <div className="mt-4 flex-1 space-y-3 overflow-y-auto">
+        {exercise.readingText && (
+          <div className="rounded-2xl border border-violet-400/30 bg-violet-500/10 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-violet-300">Read this aloud</p>
+            <p className="mt-1.5 text-lg leading-relaxed">{exercise.readingText}</p>
+          </div>
+        )}
+        {!exercise.readingText && exercise.prompt && (
+          <div className="rounded-2xl border border-violet-400/30 bg-violet-500/10 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-violet-300">Your prompt</p>
+            <p className="mt-1.5 text-base leading-snug">{exercise.prompt}</p>
+          </div>
+        )}
 
-      <div className="mt-6 w-full flex-1 overflow-y-auto rounded-2xl border border-white/10 bg-white/5 p-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-white/35">Live transcript</p>
-        <p className="mt-1.5 text-sm leading-relaxed text-white/75">
-          {transcript || <span className="text-white/30">Start speaking…</span>}
-        </p>
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-3.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-white/35">
+            {transcriptUnavailable ? 'Transcript' : 'Live transcript'}
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-white/75">
+            {transcript ? (
+              transcript
+            ) : transcriptUnavailable ? (
+              <span className="text-white/35">
+                Live transcription isn&apos;t available in this browser — your delivery is still measured, and you
+                can type what you said afterwards for structure &amp; content feedback.
+              </span>
+            ) : (
+              <span className="text-white/30">Listening… start speaking.</span>
+            )}
+          </p>
+        </div>
       </div>
 
       <Button
         onClick={onStop}
         size="lg"
-        className="mt-5 h-14 w-full rounded-2xl bg-red-500 text-base hover:bg-red-400"
+        className="mt-4 h-14 w-full shrink-0 rounded-2xl bg-red-500 text-base hover:bg-red-400"
       >
-        ⏹ Stop & get feedback
+        ⏹ Stop &amp; get feedback
       </Button>
     </div>
   );
@@ -396,6 +447,7 @@ function ResultsView({
   result,
   metrics,
   reward,
+  audioUrl,
   transcript,
   setTranscript,
   onRescore,
@@ -406,6 +458,7 @@ function ResultsView({
   result: CoachResult;
   metrics: AudioMetrics;
   reward: { streakIncreased: boolean; goalReached: boolean; streak: number } | null;
+  audioUrl: string | null;
   transcript: string;
   setTranscript: (v: string) => void;
   onRescore: () => void;
@@ -443,6 +496,21 @@ function ResultsView({
             )}
           </div>
         </div>
+
+        {/* Self-review playback + delivery timeline */}
+        {audioUrl && (
+          <DeliveryTimeline audioUrl={audioUrl} durationSec={metrics.durationSec} events={metrics.events} />
+        )}
+
+        {/* No-transcript fallback: make the type-to-score path obvious */}
+        {result.wordCount === 0 && !metrics.unavailable && (
+          <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4">
+            <p className="text-sm text-amber-100">
+              ✍️ We couldn&apos;t transcribe your words on this device. Type what you said in the box below and tap
+              Re-score to grade your Opening, Clarity &amp; Structure.
+            </p>
+          </div>
+        )}
 
         {/* Dimension breakdown */}
         <div className="space-y-2.5">

@@ -18,7 +18,7 @@ import {
   type CalibrationInput,
 } from './audio-dsp';
 
-export type { AudioMetrics, CalibrationInput } from './audio-dsp';
+export type { AudioMetrics, CalibrationInput, AudioEvent } from './audio-dsp';
 
 async function decode(blob: Blob): Promise<{ data: Float32Array; sampleRate: number } | null> {
   const Ctx: typeof AudioContext =
