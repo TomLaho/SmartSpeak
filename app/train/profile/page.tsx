@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { isSpeechRecognitionSupported } from '@/lib/speech-recognition';
 import { loadProgress, resetProgress, type Progress } from '@/lib/local-store';
+import { isProCached, refreshEntitlement, PRO_PRICE } from '@/lib/entitlement';
 import { Button } from '@/components/ui/button';
 import { MicCalibration } from '@/components/train/mic-calibration';
 
@@ -11,10 +12,13 @@ export default function ProfilePage() {
   const [progress, setProgress] = useState<Progress | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [speech, setSpeech] = useState<boolean | null>(null);
+  const [pro, setPro] = useState(false);
 
   useEffect(() => {
     setProgress(loadProgress());
     setSpeech(isSpeechRecognitionSupported());
+    setPro(isProCached());
+    refreshEntitlement().then(setPro);
   }, []);
 
   return (
@@ -46,6 +50,39 @@ export default function ProfilePage() {
       </div>
 
       <MicCalibration />
+
+      {/* Pro / unlock */}
+      <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="font-semibold text-white/80">{pro ? '✓ SmartSpeak Pro' : 'SmartSpeak Pro'}</p>
+            <p className="mt-1 text-sm text-white/55">
+              {pro
+                ? 'All reps unlocked — thanks for your support!'
+                : `Unlock all 15 work-scenario reps · ${PRO_PRICE}, one-time.`}
+            </p>
+          </div>
+          {pro && (
+            <span className="shrink-0 rounded-full bg-green-500/15 px-2.5 py-1 text-xs font-semibold text-green-300">
+              Unlocked
+            </span>
+          )}
+        </div>
+        {!pro && (
+          <div className="mt-3 flex gap-2">
+            <Button asChild className="h-10 rounded-xl bg-violet-600 hover:bg-violet-500">
+              <Link href="/train/unlock">Unlock {PRO_PRICE}</Link>
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={async () => setPro(await refreshEntitlement())}
+              className="h-10 rounded-xl text-white/60 hover:bg-white/10 hover:text-white/80"
+            >
+              Restore
+            </Button>
+          </div>
+        )}
+      </div>
 
       <div className="space-y-3">
         <Button asChild variant="secondary" className="h-12 w-full justify-between rounded-2xl bg-white/10 hover:bg-white/20">

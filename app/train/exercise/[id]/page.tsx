@@ -8,7 +8,8 @@ import { analyzeAudioInWorker, type AudioMetrics } from '@/lib/audio-analysis';
 import { coachAttempt, type CoachResult } from '@/lib/coach';
 import { loadCalibration, toCalibrationInput } from '@/lib/calibration';
 import { transcribeOnDevice, isOnDeviceTranscriptionSupported, type TranscribeProgress } from '@/lib/transcribe';
-import { recordAttempt } from '@/lib/local-store';
+import { isProCached, refreshEntitlement, canAccessExercise } from '@/lib/entitlement';
+import { loadProgress, recordAttempt } from '@/lib/local-store';
 import { createTranscriber, isSpeechRecognitionSupported, type LiveTranscriber } from '@/lib/speech-recognition';
 import { Ring } from '@/components/train/ring';
 import { DeliveryTimeline } from '@/components/train/delivery-timeline';
@@ -64,6 +65,19 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
   }, []);
 
   useEffect(() => () => cleanup(), [cleanup]);
+
+  // Gate deep links: free users get FREE_EXERCISE_LIMIT distinct exercises.
+  useEffect(() => {
+    if (!exercise) return;
+    const progress = loadProgress();
+    const alreadyAttempted = (progress.exercises[exercise.id]?.attempts ?? 0) > 0;
+    const distinctAttempted = Object.values(progress.exercises).filter((e) => e.attempts > 0).length;
+    if (canAccessExercise({ pro: isProCached(), alreadyAttempted, distinctAttempted })) return;
+    // Cached state says locked — confirm with Play before redirecting to the paywall.
+    refreshEntitlement().then((pro) => {
+      if (!canAccessExercise({ pro, alreadyAttempted, distinctAttempted })) router.replace('/train/unlock');
+    });
+  }, [exercise, router]);
 
   const finishAnalysis = useCallback(
     async (blob: Blob) => {

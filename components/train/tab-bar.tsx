@@ -18,8 +18,8 @@ const tabs = [
 
 export function TabBar() {
   const pathname = usePathname();
-  // Hide the chrome during a lesson for an immersive, full-screen take.
-  if (pathname.includes('/train/exercise/')) return null;
+  // Hide the chrome during a lesson and the paywall for a focused, full-screen view.
+  if (pathname.includes('/train/exercise/') || pathname === '/train/unlock') return null;
   return (
     <nav className="sticky bottom-0 z-20 border-t border-white/10 bg-slate-950/80 backdrop-blur">
       <div className="mx-auto flex max-w-md items-stretch justify-around px-2 py-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))]">
