@@ -21,6 +21,16 @@ function getWorker(): Worker {
   if (!worker) worker = new Worker(new URL('./transcribe.worker.ts', import.meta.url));
   return worker;
 }
+function resetWorker(): void {
+  if (worker) {
+    try {
+      worker.terminate();
+    } catch {
+      /* ignore */
+    }
+    worker = null;
+  }
+}
 
 /** True when the browser can run the on-device pipeline at all. */
 export function isOnDeviceTranscriptionSupported(): boolean {
@@ -56,7 +66,25 @@ export async function transcribeOnDevice(
   const pcm = await decodeTo16kMono(blob);
   const w = getWorker();
   return new Promise<string>((resolve, reject) => {
+    // Watchdog: if the worker stops sending anything (failed model fetch, stuck
+    // WASM, blocked thread) the take must not freeze on "Analysing…". Reset on
+    // every message so a slow model download / inference isn't cut short.
+    let watchdog: ReturnType<typeof setTimeout>;
+    const cleanup = () => {
+      clearTimeout(watchdog);
+      w.removeEventListener('message', onMessage);
+      w.removeEventListener('error', onError);
+    };
+    const arm = () => {
+      clearTimeout(watchdog);
+      watchdog = setTimeout(() => {
+        cleanup();
+        resetWorker(); // recreate a fresh worker next time
+        reject(new Error('on-device transcription timed out'));
+      }, 90_000);
+    };
     const onMessage = (e: MessageEvent) => {
+      arm();
       const m = e.data ?? {};
       if (m.type === 'progress') {
         const pct =
@@ -67,14 +95,21 @@ export async function transcribeOnDevice(
       } else if (m.type === 'status' && m.stage === 'transcribing') {
         onProgress?.({ stage: 'transcribing' });
       } else if (m.type === 'result') {
-        w.removeEventListener('message', onMessage);
+        cleanup();
         resolve(String(m.text ?? '').trim());
       } else if (m.type === 'error') {
-        w.removeEventListener('message', onMessage);
+        cleanup();
         reject(new Error(m.message || 'transcription failed'));
       }
     };
+    const onError = (e: ErrorEvent) => {
+      cleanup();
+      resetWorker(); // worker script failed to load — don't reuse it
+      reject(new Error(e.message || 'transcription worker failed'));
+    };
     w.addEventListener('message', onMessage);
+    w.addEventListener('error', onError);
+    arm();
     const copy = pcm.slice();
     w.postMessage({ pcm: copy.buffer }, [copy.buffer]);
   });
