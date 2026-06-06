@@ -17,7 +17,6 @@ import { cn } from '@/lib/utils';
 import type { Exercise } from '@/lib/exercises';
 
 type Phase = 'intro' | 'recording' | 'analyzing' | 'results';
-type TranscriptionState = 'idle' | 'listening' | 'unavailable' | 'unsupported';
 
 export default function ExercisePlayer({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -32,7 +31,6 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
   const [result, setResult] = useState<CoachResult | null>(null);
   const [reward, setReward] = useState<{ streakIncreased: boolean; goalReached: boolean; streak: number } | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [transcriptionState, setTranscriptionState] = useState<TranscriptionState>('idle');
   const [transcriptionDiag, setTranscriptionDiag] = useState<string | null>(null);
   const [transcribeStatus, setTranscribeStatus] = useState<TranscribeProgress | null>(null);
 
@@ -130,25 +128,17 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     transcriptRef.current = '';
     setSeconds(0);
     chunksRef.current = [];
-    setTranscriptionState(speechSupported ? 'listening' : 'unsupported');
-
-    // Start live transcription *synchronously* inside the tap handler. Android
-    // Chrome blocks SpeechRecognition.start() once the user gesture is consumed
-    // by `await getUserMedia`, which is why transcription previously never ran.
+    // Best-effort live transcription, started *synchronously* inside the tap
+    // handler (Android Chrome blocks SpeechRecognition.start() once the user
+    // gesture is consumed by `await getUserMedia`). Where it works (e.g. desktop
+    // Chrome) we get an instant transcript; otherwise we transcribe the recorded
+    // clip on-device after the take. Lifecycle is captured for diagnostics.
     sttDiagRef.current = { audioStarted: false, gotResult: false, error: null };
     const transcriber = createTranscriber({
       onTranscript: (text) => {
         transcriptRef.current = text;
         setTranscript(text);
-        if (text) {
-          sttDiagRef.current.gotResult = true;
-          setTranscriptionState('listening');
-        }
-      },
-      onError: (e) => {
-        if (['not-allowed', 'service-not-allowed', 'network', 'language-not-supported', 'audio-capture'].includes(e)) {
-          setTranscriptionState('unavailable');
-        }
+        if (text) sttDiagRef.current.gotResult = true;
       },
       onStatus: (s) => {
         if (s === 'audiostart') sttDiagRef.current.audioStarted = true;
@@ -203,7 +193,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
       transcriberRef.current = null;
       setError('Microphone access is required. Please allow it and try again.');
     }
-  }, [finishAnalysis, speechSupported]);
+  }, [finishAnalysis]);
 
   const stopRecording = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -235,7 +225,6 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     setAudioUrl(null);
     setTranscript('');
     transcriptRef.current = '';
-    setTranscriptionState('idle');
     setTranscriptionDiag(null);
     setTranscribeStatus(null);
     setPhase('intro');
@@ -276,8 +265,6 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
           exercise={exercise}
           seconds={seconds}
           level={level}
-          transcript={transcript}
-          transcriptionState={transcriptionState}
           targetPct={targetPct}
           reachedTarget={reachedTarget}
           targetSeconds={exercise.targetSeconds}
@@ -419,8 +406,6 @@ function RecordingView({
   exercise,
   seconds,
   level,
-  transcript,
-  transcriptionState,
   targetPct,
   reachedTarget,
   targetSeconds,
@@ -429,15 +414,12 @@ function RecordingView({
   exercise: Exercise;
   seconds: number;
   level: number;
-  transcript: string;
-  transcriptionState: TranscriptionState;
   targetPct: number;
   reachedTarget: boolean;
   targetSeconds: number;
   onStop: () => void;
 }) {
   const mmss = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-  const transcriptUnavailable = transcriptionState === 'unavailable' || transcriptionState === 'unsupported';
   return (
     <div className="flex flex-1 flex-col">
       {/* Compact timer + live level meter */}
@@ -477,30 +459,16 @@ function RecordingView({
             <p className="mt-1.5 text-base leading-snug">{exercise.prompt}</p>
           </div>
         )}
-
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-3.5">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-white/35">
-            {transcriptUnavailable ? 'Transcript' : 'Live transcript'}
-          </p>
-          <p className="mt-1 text-sm leading-relaxed text-white/75">
-            {transcript ? (
-              transcript
-            ) : transcriptUnavailable ? (
-              <span className="text-white/35">
-                Live transcription isn&apos;t available in this browser — your delivery is still measured, and you
-                can type what you said afterwards for structure &amp; content feedback.
-              </span>
-            ) : (
-              <span className="text-white/30">Listening… start speaking.</span>
-            )}
-          </p>
-        </div>
       </div>
+
+      <p className="mt-3 shrink-0 text-center text-[11px] text-white/35">
+        🎙️ Recording — we&apos;ll transcribe &amp; score this automatically when you stop.
+      </p>
 
       <Button
         onClick={onStop}
         size="lg"
-        className="mt-4 h-14 w-full shrink-0 rounded-2xl bg-red-500 text-base hover:bg-red-400"
+        className="mt-3 h-14 w-full shrink-0 rounded-2xl bg-red-500 text-base hover:bg-red-400"
       >
         ⏹ Stop &amp; get feedback
       </Button>
