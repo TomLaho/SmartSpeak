@@ -32,6 +32,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
   const [reward, setReward] = useState<{ streakIncreased: boolean; goalReached: boolean; streak: number } | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [transcriptionState, setTranscriptionState] = useState<TranscriptionState>('idle');
+  const [transcriptionDiag, setTranscriptionDiag] = useState<string | null>(null);
 
   // Recording infra refs.
   const streamRef = useRef<MediaStream | null>(null);
@@ -42,6 +43,11 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const transcriberRef = useRef<LiveTranscriber | null>(null);
   const transcriptRef = useRef('');
+  const sttDiagRef = useRef<{ audioStarted: boolean; gotResult: boolean; error: string | null }>({
+    audioStarted: false,
+    gotResult: false,
+    error: null,
+  });
 
   const speechSupported = useMemo(() => isSpeechRecognitionSupported(), []);
 
@@ -65,6 +71,22 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
       setPhase('analyzing');
       const text = transcriptRef.current.trim();
       const wordCount = text ? text.split(/\s+/).filter(Boolean).length : undefined;
+      if (!wordCount) {
+        const d = sttDiagRef.current;
+        setTranscriptionDiag(
+          !speechSupported
+            ? 'this browser has no speech recognition'
+            : d.error
+            ? `speech recognition error: ${d.error}`
+            : !d.audioStarted
+            ? 'the recorder is holding the mic, so speech recognition received no audio'
+            : !d.gotResult
+            ? 'speech recognition ran but returned no words'
+            : 'no words were captured'
+        );
+      } else {
+        setTranscriptionDiag(null);
+      }
       const calibration = toCalibrationInput(loadCalibration());
       const audio = await analyzeAudioInWorker(blob, wordCount, calibration);
       setMetrics(audio);
@@ -83,7 +105,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
       });
       setPhase('results');
     },
-    [exercise]
+    [exercise, speechSupported]
   );
 
   const startRecording = useCallback(async () => {
@@ -97,16 +119,25 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     // Start live transcription *synchronously* inside the tap handler. Android
     // Chrome blocks SpeechRecognition.start() once the user gesture is consumed
     // by `await getUserMedia`, which is why transcription previously never ran.
+    sttDiagRef.current = { audioStarted: false, gotResult: false, error: null };
     const transcriber = createTranscriber({
       onTranscript: (text) => {
         transcriptRef.current = text;
         setTranscript(text);
-        if (text) setTranscriptionState('listening');
+        if (text) {
+          sttDiagRef.current.gotResult = true;
+          setTranscriptionState('listening');
+        }
       },
       onError: (e) => {
-        if (['not-allowed', 'service-not-allowed', 'network', 'language-not-supported'].includes(e)) {
+        if (['not-allowed', 'service-not-allowed', 'network', 'language-not-supported', 'audio-capture'].includes(e)) {
           setTranscriptionState('unavailable');
         }
+      },
+      onStatus: (s) => {
+        if (s === 'audiostart') sttDiagRef.current.audioStarted = true;
+        else if (s === 'result') sttDiagRef.current.gotResult = true;
+        else if (s.startsWith('error:')) sttDiagRef.current.error = s.slice(6);
       },
     });
     transcriberRef.current = transcriber;
@@ -189,6 +220,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     setTranscript('');
     transcriptRef.current = '';
     setTranscriptionState('idle');
+    setTranscriptionDiag(null);
     setPhase('intro');
   }, [cleanup]);
 
@@ -249,6 +281,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
           metrics={metrics}
           reward={reward}
           audioUrl={audioUrl}
+          transcriptionDiag={transcriptionDiag}
           transcript={transcript}
           setTranscript={setTranscript}
           onRescore={rescore}
@@ -448,6 +481,7 @@ function ResultsView({
   metrics,
   reward,
   audioUrl,
+  transcriptionDiag,
   transcript,
   setTranscript,
   onRescore,
@@ -459,6 +493,7 @@ function ResultsView({
   metrics: AudioMetrics;
   reward: { streakIncreased: boolean; goalReached: boolean; streak: number } | null;
   audioUrl: string | null;
+  transcriptionDiag: string | null;
   transcript: string;
   setTranscript: (v: string) => void;
   onRescore: () => void;
@@ -509,6 +544,9 @@ function ResultsView({
               ✍️ We couldn&apos;t transcribe your words on this device. Type what you said in the box below and tap
               Re-score to grade your Opening, Clarity &amp; Structure.
             </p>
+            {transcriptionDiag && (
+              <p className="mt-1.5 text-xs text-amber-200/70">Why: {transcriptionDiag}.</p>
+            )}
           </div>
         )}
 
