@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { isSpeechRecognitionSupported } from '@/lib/speech-recognition';
 import { loadProgress, resetProgress, type Progress } from '@/lib/local-store';
 import { Button } from '@/components/ui/button';
+import { MicCalibration } from '@/components/train/mic-calibration';
 
 export default function ProfilePage() {
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -45,6 +46,8 @@ export default function ProfilePage() {
           </span>
         </p>
       </div>
+
+      <MicCalibration />
 
       <div className="space-y-3">
         <Button asChild variant="secondary" className="h-12 w-full justify-between rounded-2xl bg-white/10 hover:bg-white/20">
