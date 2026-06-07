@@ -13,6 +13,13 @@ import {
 } from '@/lib/exercises';
 import { loadProgress, type Progress } from '@/lib/local-store';
 import { loadCalibration, isCalibrationNudgeDismissed, dismissCalibrationNudge } from '@/lib/calibration';
+import {
+  isProCached,
+  refreshEntitlement,
+  canAccessExercise,
+  FREE_EXERCISE_LIMIT,
+  PRO_PRICE,
+} from '@/lib/entitlement';
 import { Ring } from '@/components/train/ring';
 import { LogoMark } from '@/components/brand/logo';
 import { cn } from '@/lib/utils';
@@ -20,19 +27,30 @@ import { cn } from '@/lib/utils';
 export default function TrainHome() {
   const [progress, setProgress] = useState<Progress | null>(null);
   const [showCalNudge, setShowCalNudge] = useState(false);
+  const [pro, setPro] = useState(false);
 
   useEffect(() => {
     setProgress(loadProgress());
     setShowCalNudge(!loadCalibration() && !isCalibrationNudgeDismissed());
+    setPro(isProCached());
+    refreshEntitlement().then(setPro);
   }, []);
 
   const goalPct = progress ? Math.min(100, (progress.todayXp / DAILY_GOAL_XP) * 100) : 0;
   const goalDone = (progress?.todayXp ?? 0) >= DAILY_GOAL_XP;
 
   const attempted = (id: string) => (progress?.exercises[id]?.attempts ?? 0) > 0;
+  const distinctAttempted = progress
+    ? Object.values(progress.exercises).filter((e) => e.attempts > 0).length
+    : 0;
   const allDone = progress ? EXERCISES.every((e) => attempted(e.id)) : false;
   const upNext = nextExercise(attempted);
-  const started = progress ? Object.values(progress.exercises).some((e) => e.attempts > 0) : false;
+  const started = distinctAttempted > 0;
+  const upNextAccessible = canAccessExercise({
+    pro,
+    alreadyAttempted: attempted(upNext.id),
+    distinctAttempted,
+  });
 
   return (
     <div className="px-5 pb-8 pt-5">
@@ -87,42 +105,96 @@ export default function TrainHome() {
         </div>
       )}
 
-      {/* Up next — primary action */}
-      <Link
-        href={`/train/exercise/${upNext.id}`}
-        className="mb-8 block rounded-3xl border border-violet-400/30 bg-gradient-to-br from-violet-600/25 to-blue-600/20 p-5 transition-transform active:scale-[0.99]"
-      >
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold uppercase tracking-wide text-violet-200">
-            {allDone ? 'Sharpen up' : started ? 'Continue' : 'Start here'}
-          </p>
-          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/60">{upNext.scenario}</span>
-        </div>
-        <div className="mt-2 flex items-center gap-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-2xl">
-            {upNext.emoji}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-lg font-bold leading-tight">{upNext.title}</p>
-            <p className="truncate text-sm text-white/60">
-              {allDone ? 'Replay to beat your best score.' : upNext.summary}
+      {/* Up next — primary action (or unlock once free reps are used up) */}
+      {upNextAccessible ? (
+        <Link
+          href={`/train/exercise/${upNext.id}`}
+          className="mb-8 block rounded-3xl border border-violet-400/30 bg-gradient-to-br from-violet-600/25 to-blue-600/20 p-5 transition-transform active:scale-[0.99]"
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-wide text-violet-200">
+              {allDone ? 'Sharpen up' : started ? 'Continue' : 'Start here'}
             </p>
+            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/60">{upNext.scenario}</span>
           </div>
-          <span className="shrink-0 rounded-full bg-violet-500 px-4 py-2 text-sm font-semibold">Go</span>
-        </div>
-      </Link>
+          <div className="mt-2 flex items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-2xl">
+              {upNext.emoji}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-lg font-bold leading-tight">{upNext.title}</p>
+              <p className="truncate text-sm text-white/60">
+                {allDone ? 'Replay to beat your best score.' : upNext.summary}
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full bg-violet-500 px-4 py-2 text-sm font-semibold">Go</span>
+          </div>
+        </Link>
+      ) : (
+        <Link
+          href="/train/unlock"
+          className="mb-8 block rounded-3xl border border-violet-400/30 bg-gradient-to-br from-violet-600/30 to-blue-600/25 p-5 transition-transform active:scale-[0.99]"
+        >
+          <p className="text-xs font-semibold uppercase tracking-wide text-violet-200">SmartSpeak Pro</p>
+          <div className="mt-2 flex items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-2xl">🔓</div>
+            <div className="min-w-0 flex-1">
+              <p className="text-lg font-bold leading-tight">Unlock all 15 reps</p>
+              <p className="truncate text-sm text-white/60">
+                You&apos;ve used your {FREE_EXERCISE_LIMIT} free reps — keep training for {PRO_PRICE}.
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full bg-violet-500 px-4 py-2 text-sm font-semibold">{PRO_PRICE}</span>
+          </div>
+        </Link>
+      )}
+
+      {/* Free-preview progress (gentle conversion nudge) */}
+      {!pro && distinctAttempted < FREE_EXERCISE_LIMIT && (
+        <Link
+          href="/train/unlock"
+          className="mb-5 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 p-3.5"
+        >
+          <p className="text-sm text-white/70">
+            🔓 Free preview ·{' '}
+            <span className="font-semibold text-white/90">
+              {distinctAttempted}/{FREE_EXERCISE_LIMIT}
+            </span>{' '}
+            free reps used
+          </p>
+          <span className="shrink-0 rounded-full bg-violet-500 px-3 py-1.5 text-xs font-semibold">
+            Unlock {PRO_PRICE}
+          </span>
+        </Link>
+      )}
 
       {/* Skill paths */}
       <div className="space-y-9">
         {(Object.keys(TRACKS) as TrackId[]).map((trackId) => (
-          <TrackPath key={trackId} trackId={trackId} progress={progress} />
+          <TrackPath
+            key={trackId}
+            trackId={trackId}
+            progress={progress}
+            pro={pro}
+            distinctAttempted={distinctAttempted}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function TrackPath({ trackId, progress }: { trackId: TrackId; progress: Progress | null }) {
+function TrackPath({
+  trackId,
+  progress,
+  pro,
+  distinctAttempted,
+}: {
+  trackId: TrackId;
+  progress: Progress | null;
+  pro: boolean;
+  distinctAttempted: number;
+}) {
   const track = TRACKS[trackId];
   const exercises = useMemo(() => exercisesByTrack(trackId), [trackId]);
 
@@ -142,19 +214,17 @@ function TrackPath({ trackId, progress }: { trackId: TrackId; progress: Progress
         {exercises.map((exercise, i) => {
           const prev = exercises[i - 1];
           const prevDone = !prev || (progress?.exercises[prev.id]?.attempts ?? 0) > 0;
-          const state = progress
-            ? (progress.exercises[exercise.id]?.attempts ?? 0) > 0
-              ? 'done'
-              : prevDone
-              ? 'open'
-              : 'locked'
-            : 'open';
+          const isAttempted = (progress?.exercises[exercise.id]?.attempts ?? 0) > 0;
+          let state: NodeState = progress ? (isAttempted ? 'done' : prevDone ? 'open' : 'locked') : 'open';
+          if (state === 'open' && !canAccessExercise({ pro, alreadyAttempted: isAttempted, distinctAttempted })) {
+            state = 'pro';
+          }
           return (
             <PathNode
               key={exercise.id}
               exercise={exercise}
               accent={track.accent}
-              state={state as NodeState}
+              state={state}
               best={progress?.exercises[exercise.id]?.bestScore}
             />
           );
@@ -164,7 +234,7 @@ function TrackPath({ trackId, progress }: { trackId: TrackId; progress: Progress
   );
 }
 
-type NodeState = 'done' | 'open' | 'locked';
+type NodeState = 'done' | 'open' | 'locked' | 'pro';
 
 function PathNode({
   exercise,
@@ -178,12 +248,15 @@ function PathNode({
   best?: number;
 }) {
   const locked = state === 'locked';
+  const isPro = state === 'pro';
   const content = (
     <div
       className={cn(
         'flex items-center gap-4 rounded-2xl border p-3.5 transition-colors',
         locked
           ? 'border-white/5 bg-white/[0.02] opacity-55'
+          : isPro
+          ? 'border-violet-400/20 bg-white/5 hover:bg-white/10 active:scale-[0.99]'
           : 'border-white/10 bg-white/5 hover:bg-white/10 active:scale-[0.99]'
       )}
     >
@@ -214,9 +287,14 @@ function PathNode({
         </div>
       )}
       {state === 'open' && <span className="shrink-0 text-white/30">›</span>}
+      {isPro && (
+        <span className="shrink-0 rounded-full bg-violet-500/20 px-2.5 py-1 text-[10px] font-bold text-violet-200">
+          PRO
+        </span>
+      )}
     </div>
   );
 
   if (locked) return content;
-  return <Link href={`/train/exercise/${exercise.id}`}>{content}</Link>;
+  return <Link href={isPro ? '/train/unlock' : `/train/exercise/${exercise.id}`}>{content}</Link>;
 }

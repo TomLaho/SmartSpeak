@@ -7,7 +7,9 @@ import { getExercise } from '@/lib/exercises';
 import { analyzeAudioInWorker, type AudioMetrics } from '@/lib/audio-analysis';
 import { coachAttempt, type CoachResult } from '@/lib/coach';
 import { loadCalibration, toCalibrationInput } from '@/lib/calibration';
-import { recordAttempt } from '@/lib/local-store';
+import { transcribeOnDevice, isOnDeviceTranscriptionSupported, type TranscribeProgress } from '@/lib/transcribe';
+import { isProCached, refreshEntitlement, canAccessExercise } from '@/lib/entitlement';
+import { loadProgress, recordAttempt } from '@/lib/local-store';
 import { createTranscriber, isSpeechRecognitionSupported, type LiveTranscriber } from '@/lib/speech-recognition';
 import { Ring } from '@/components/train/ring';
 import { DeliveryTimeline } from '@/components/train/delivery-timeline';
@@ -16,7 +18,6 @@ import { cn } from '@/lib/utils';
 import type { Exercise } from '@/lib/exercises';
 
 type Phase = 'intro' | 'recording' | 'analyzing' | 'results';
-type TranscriptionState = 'idle' | 'listening' | 'unavailable' | 'unsupported';
 
 export default function ExercisePlayer({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -31,7 +32,8 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
   const [result, setResult] = useState<CoachResult | null>(null);
   const [reward, setReward] = useState<{ streakIncreased: boolean; goalReached: boolean; streak: number } | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [transcriptionState, setTranscriptionState] = useState<TranscriptionState>('idle');
+  const [transcriptionDiag, setTranscriptionDiag] = useState<string | null>(null);
+  const [transcribeStatus, setTranscribeStatus] = useState<TranscribeProgress | null>(null);
 
   // Recording infra refs.
   const streamRef = useRef<MediaStream | null>(null);
@@ -42,6 +44,11 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const transcriberRef = useRef<LiveTranscriber | null>(null);
   const transcriptRef = useRef('');
+  const sttDiagRef = useRef<{ audioStarted: boolean; gotResult: boolean; error: string | null }>({
+    audioStarted: false,
+    gotResult: false,
+    error: null,
+  });
 
   const speechSupported = useMemo(() => isSpeechRecognitionSupported(), []);
 
@@ -59,12 +66,55 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
 
   useEffect(() => () => cleanup(), [cleanup]);
 
+  // Gate deep links: free users get FREE_EXERCISE_LIMIT distinct exercises.
+  useEffect(() => {
+    if (!exercise) return;
+    const progress = loadProgress();
+    const alreadyAttempted = (progress.exercises[exercise.id]?.attempts ?? 0) > 0;
+    const distinctAttempted = Object.values(progress.exercises).filter((e) => e.attempts > 0).length;
+    if (canAccessExercise({ pro: isProCached(), alreadyAttempted, distinctAttempted })) return;
+    // Cached state says locked — confirm with Play before redirecting to the paywall.
+    refreshEntitlement().then((pro) => {
+      if (!canAccessExercise({ pro, alreadyAttempted, distinctAttempted })) router.replace('/train/unlock');
+    });
+  }, [exercise, router]);
+
   const finishAnalysis = useCallback(
     async (blob: Blob) => {
       if (!exercise) return;
       setPhase('analyzing');
-      const text = transcriptRef.current.trim();
+      let text = transcriptRef.current.trim();
+
+      // No live transcript (the norm on Android) → transcribe the recorded clip
+      // on-device. No mic contention, no upload, no backend.
+      if (!text && isOnDeviceTranscriptionSupported()) {
+        try {
+          setTranscribeStatus({ stage: 'loading' });
+          text = (await transcribeOnDevice(blob, (p) => setTranscribeStatus(p))).trim();
+          if (text) {
+            transcriptRef.current = text;
+            setTranscript(text);
+          }
+        } catch (err: any) {
+          sttDiagRef.current.error = sttDiagRef.current.error || `on-device transcription: ${err?.message ?? 'failed'}`;
+        } finally {
+          setTranscribeStatus(null);
+        }
+      }
+
       const wordCount = text ? text.split(/\s+/).filter(Boolean).length : undefined;
+      if (!wordCount) {
+        const d = sttDiagRef.current;
+        setTranscriptionDiag(
+          d.error
+            ? `transcription error: ${d.error}`
+            : !isOnDeviceTranscriptionSupported()
+            ? 'this browser cannot run on-device transcription'
+            : 'we could not make out any speech in the recording'
+        );
+      } else {
+        setTranscriptionDiag(null);
+      }
       const calibration = toCalibrationInput(loadCalibration());
       const audio = await analyzeAudioInWorker(blob, wordCount, calibration);
       setMetrics(audio);
@@ -92,21 +142,22 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     transcriptRef.current = '';
     setSeconds(0);
     chunksRef.current = [];
-    setTranscriptionState(speechSupported ? 'listening' : 'unsupported');
-
-    // Start live transcription *synchronously* inside the tap handler. Android
-    // Chrome blocks SpeechRecognition.start() once the user gesture is consumed
-    // by `await getUserMedia`, which is why transcription previously never ran.
+    // Best-effort live transcription, started *synchronously* inside the tap
+    // handler (Android Chrome blocks SpeechRecognition.start() once the user
+    // gesture is consumed by `await getUserMedia`). Where it works (e.g. desktop
+    // Chrome) we get an instant transcript; otherwise we transcribe the recorded
+    // clip on-device after the take. Lifecycle is captured for diagnostics.
+    sttDiagRef.current = { audioStarted: false, gotResult: false, error: null };
     const transcriber = createTranscriber({
       onTranscript: (text) => {
         transcriptRef.current = text;
         setTranscript(text);
-        if (text) setTranscriptionState('listening');
+        if (text) sttDiagRef.current.gotResult = true;
       },
-      onError: (e) => {
-        if (['not-allowed', 'service-not-allowed', 'network', 'language-not-supported'].includes(e)) {
-          setTranscriptionState('unavailable');
-        }
+      onStatus: (s) => {
+        if (s === 'audiostart') sttDiagRef.current.audioStarted = true;
+        else if (s === 'result') sttDiagRef.current.gotResult = true;
+        else if (s.startsWith('error:')) sttDiagRef.current.error = s.slice(6);
       },
     });
     transcriberRef.current = transcriber;
@@ -156,7 +207,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
       transcriberRef.current = null;
       setError('Microphone access is required. Please allow it and try again.');
     }
-  }, [finishAnalysis, speechSupported]);
+  }, [finishAnalysis]);
 
   const stopRecording = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -188,7 +239,8 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     setAudioUrl(null);
     setTranscript('');
     transcriptRef.current = '';
-    setTranscriptionState('idle');
+    setTranscriptionDiag(null);
+    setTranscribeStatus(null);
     setPhase('intro');
   }, [cleanup]);
 
@@ -227,8 +279,6 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
           exercise={exercise}
           seconds={seconds}
           level={level}
-          transcript={transcript}
-          transcriptionState={transcriptionState}
           targetPct={targetPct}
           reachedTarget={reachedTarget}
           targetSeconds={exercise.targetSeconds}
@@ -237,9 +287,26 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
       )}
 
       {phase === 'analyzing' && (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4">
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
           <div className="h-12 w-12 animate-spin rounded-full border-4 border-white/15 border-t-violet-500" />
-          <p className="text-white/60">Analysing your delivery…</p>
+          {transcribeStatus ? (
+            <div>
+              <p className="text-white/70">
+                {transcribeStatus.stage === 'loading'
+                  ? 'Setting up on-device transcription…'
+                  : 'Transcribing your words…'}
+              </p>
+              {transcribeStatus.stage === 'loading' && (
+                <p className="mt-1 text-xs text-white/40">
+                  One-time download of a small, private speech model
+                  {typeof transcribeStatus.percent === 'number' ? ` · ${transcribeStatus.percent}%` : ''} — cached after
+                  this.
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-white/60">Analysing your delivery…</p>
+          )}
         </div>
       )}
 
@@ -249,6 +316,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
           metrics={metrics}
           reward={reward}
           audioUrl={audioUrl}
+          transcriptionDiag={transcriptionDiag}
           transcript={transcript}
           setTranscript={setTranscript}
           onRescore={rescore}
@@ -352,8 +420,6 @@ function RecordingView({
   exercise,
   seconds,
   level,
-  transcript,
-  transcriptionState,
   targetPct,
   reachedTarget,
   targetSeconds,
@@ -362,15 +428,12 @@ function RecordingView({
   exercise: Exercise;
   seconds: number;
   level: number;
-  transcript: string;
-  transcriptionState: TranscriptionState;
   targetPct: number;
   reachedTarget: boolean;
   targetSeconds: number;
   onStop: () => void;
 }) {
   const mmss = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-  const transcriptUnavailable = transcriptionState === 'unavailable' || transcriptionState === 'unsupported';
   return (
     <div className="flex flex-1 flex-col">
       {/* Compact timer + live level meter */}
@@ -410,30 +473,16 @@ function RecordingView({
             <p className="mt-1.5 text-base leading-snug">{exercise.prompt}</p>
           </div>
         )}
-
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-3.5">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-white/35">
-            {transcriptUnavailable ? 'Transcript' : 'Live transcript'}
-          </p>
-          <p className="mt-1 text-sm leading-relaxed text-white/75">
-            {transcript ? (
-              transcript
-            ) : transcriptUnavailable ? (
-              <span className="text-white/35">
-                Live transcription isn&apos;t available in this browser — your delivery is still measured, and you
-                can type what you said afterwards for structure &amp; content feedback.
-              </span>
-            ) : (
-              <span className="text-white/30">Listening… start speaking.</span>
-            )}
-          </p>
-        </div>
       </div>
+
+      <p className="mt-3 shrink-0 text-center text-[11px] text-white/35">
+        🎙️ Recording — we&apos;ll transcribe &amp; score this automatically when you stop.
+      </p>
 
       <Button
         onClick={onStop}
         size="lg"
-        className="mt-4 h-14 w-full shrink-0 rounded-2xl bg-red-500 text-base hover:bg-red-400"
+        className="mt-3 h-14 w-full shrink-0 rounded-2xl bg-red-500 text-base hover:bg-red-400"
       >
         ⏹ Stop &amp; get feedback
       </Button>
@@ -448,6 +497,7 @@ function ResultsView({
   metrics,
   reward,
   audioUrl,
+  transcriptionDiag,
   transcript,
   setTranscript,
   onRescore,
@@ -459,6 +509,7 @@ function ResultsView({
   metrics: AudioMetrics;
   reward: { streakIncreased: boolean; goalReached: boolean; streak: number } | null;
   audioUrl: string | null;
+  transcriptionDiag: string | null;
   transcript: string;
   setTranscript: (v: string) => void;
   onRescore: () => void;
@@ -509,6 +560,9 @@ function ResultsView({
               ✍️ We couldn&apos;t transcribe your words on this device. Type what you said in the box below and tap
               Re-score to grade your Opening, Clarity &amp; Structure.
             </p>
+            {transcriptionDiag && (
+              <p className="mt-1.5 text-xs text-amber-200/70">Why: {transcriptionDiag}.</p>
+            )}
           </div>
         )}
 

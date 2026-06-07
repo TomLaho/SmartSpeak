@@ -163,6 +163,22 @@ export default function LandingPage() {
             </Button>
           </div>
         </section>
+
+        <footer className="mt-16 flex flex-col items-center gap-4 border-t pt-8 text-sm text-muted-foreground sm:flex-row sm:justify-between">
+          <Logo size={24} />
+          <div className="flex items-center gap-5">
+            <Link href="/privacy" className="hover:text-foreground">
+              Privacy
+            </Link>
+            <Link href="/terms" className="hover:text-foreground">
+              Terms
+            </Link>
+            <Link href="/train" className="hover:text-foreground">
+              Open the app
+            </Link>
+          </div>
+          <p>© {new Date().getFullYear()} SmartSpeak</p>
+        </footer>
       </div>
     </div>
   );
