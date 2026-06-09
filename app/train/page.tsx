@@ -85,7 +85,7 @@ export default function TrainHome() {
       {showCalNudge && (
         <div className="mb-5 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3.5">
           <span className="text-lg">🎚️</span>
-          <p className="flex-1 text-sm text-white/70">Calibrate your mic (2s) for sharper, room-aware feedback.</p>
+          <p className="flex-1 text-sm text-white/70">Calibrate your mic (2s) to tune volume feedback to your voice.</p>
           <Link
             href="/train/profile"
             className="shrink-0 rounded-full bg-violet-500 px-3 py-1.5 text-xs font-semibold"

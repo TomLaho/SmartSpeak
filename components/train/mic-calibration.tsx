@@ -36,8 +36,8 @@ export function MicCalibration() {
           <p className="font-semibold text-white/80">🎚️ Microphone calibration</p>
           <p className="mt-1 text-sm text-white/55">
             {profile
-              ? 'Your mic is calibrated — pauses, fillers and volume are tuned to your room.'
-              : 'Take 2 seconds to tune the analysis to your room and mic for sharper feedback.'}
+              ? 'Your mic is calibrated — volume feedback is tuned to your usual speaking level.'
+              : 'Take 2 seconds so we can flag when you’re quieter or louder than your usual level.'}
           </p>
         </div>
         {profile && (

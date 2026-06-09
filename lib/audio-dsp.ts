@@ -188,15 +188,15 @@ export function analyzePcm(
   const frameCount = rms.length;
   if (frameCount === 0) return { ...UNAVAILABLE_METRICS, durationSec };
 
-  // Adaptive silence threshold from the energy distribution, raised to sit above
-  // the calibrated noise floor when we have one (more reliable in noisy rooms).
+  // Adaptive silence threshold from this clip's own energy distribution.
   const sortedRms = [...rms].sort((a, b) => a - b);
   const noiseFloor = percentile(sortedRms, 10);
   const loud = percentile(sortedRms, 90);
-  let threshold = Math.max(noiseFloor + (loud - noiseFloor) * 0.18, 0.008);
-  if (calibration?.noiseFloorRms && calibration.noiseFloorRms > 0) {
-    threshold = Math.max(threshold, calibration.noiseFloorRms * 1.8);
-  }
+  // NOTE: we deliberately do NOT raise this from calibration. A "speak normally"
+  // calibration sample's low percentile is still speech, so using it as a gate
+  // over-segmented real speech — inflating pace (smaller speaking time) and
+  // pause counts. The per-clip percentile gate is robust on its own.
+  const threshold = Math.max(noiseFloor + (loud - noiseFloor) * 0.18, 0.008);
 
   // Segment speech vs. silence.
   const segments: Array<{ start: number; end: number }> = [];
