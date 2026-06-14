@@ -43,6 +43,9 @@ export function masteryGateMessage(progress: Progress, trackId: string): string 
       needed += 2; // not started: needs 2 clean reps
       continue;
     }
+    // TODO: overcounts — uses total attempts capped at 2 rather than counting attempts
+    // whose individual score was ≥70. ExerciseProgress only stores bestScore, not per-attempt
+    // scores, so fixing this requires new data plumbing (e.g. storing an array of scores).
     const cleanReps = ep.attempts > 0 && ep.bestScore >= 70 ? Math.min(ep.attempts, 2) : 0;
     if (cleanReps < 2) needed += 2 - cleanReps;
   }

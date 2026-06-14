@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import { cn } from '@/lib/utils';
 
 interface SparklineProps {
@@ -23,6 +24,9 @@ export function Sparkline({
   color = '#FFC857',
   className,
 }: SparklineProps) {
+  const uid = useId();
+  const gradientId = `spark-fill-${uid.replace(/:/g, '')}`;
+
   if (values.length < 2) {
     // Placeholder: three short dashes indicating no trend yet.
     return (
@@ -70,7 +74,7 @@ export function Sparkline({
       aria-hidden="true"
     >
       <defs>
-        <linearGradient id={`spark-fill-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.25" />
           <stop offset="100%" stopColor={color} stopOpacity="0.02" />
         </linearGradient>
@@ -78,7 +82,7 @@ export function Sparkline({
       {/* Area fill */}
       <path
         d={areaPath}
-        fill={`url(#spark-fill-${color.replace('#', '')})`}
+        fill={`url(#${gradientId})`}
         stroke="none"
       />
       {/* Line */}

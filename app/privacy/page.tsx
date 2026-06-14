@@ -42,8 +42,8 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-xl font-semibold">On-device transcription</h2>
           <p>
-            To turn speech into text, the app downloads a small speech-recognition model once from a public content
-            delivery network and caches it on your device. Only the model is downloaded — <strong>your voice is not
+            To turn speech into text, the app loads a small speech-recognition model from the app itself (served from
+            this site) once and caches it on your device. Only the model is downloaded — <strong>your voice is not
             sent anywhere</strong>. Transcription then runs locally and works offline.
           </p>
         </section>

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { isSpeechRecognitionSupported } from '@/lib/speech-recognition';
 import { loadProgress, resetProgress, loadDailyGoalReps, saveDailyGoalReps, type Progress } from '@/lib/local-store';
 import { isProCached, refreshEntitlement, PRO_PRICE } from '@/lib/entitlement';
 import { Button } from '@/components/ui/button';
@@ -14,13 +13,11 @@ const REP_OPTIONS = [1, 2, 3] as const;
 export default function ProfilePage() {
   const [progress, setProgress] = useState<Progress | null>(null);
   const [confirming, setConfirming] = useState(false);
-  const [speech, setSpeech] = useState<boolean | null>(null);
   const [pro, setPro] = useState(false);
   const [dailyGoalReps, setDailyGoalReps] = useState<number>(1);
 
   useEffect(() => {
     setProgress(loadProgress());
-    setSpeech(isSpeechRecognitionSupported());
     setPro(isProCached());
     refreshEntitlement().then(setPro);
     setDailyGoalReps(loadDailyGoalReps());
@@ -86,7 +83,7 @@ export default function ProfilePage() {
         </p>
         <p className="mt-2">
           Transcription runs <span className="text-stage">on-device</span> — your words are transcribed from the
-          recording locally{speech ? ', with live captions while you speak.' : ' (a small speech model downloads once, then works offline).'}
+          recording locally (a small speech model downloads once, then works offline).
         </p>
       </div>
 

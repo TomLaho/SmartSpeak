@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import { siteConfig } from '@/lib/site';
 import { cn } from '@/lib/utils';
+import { SwRegister } from '@/components/sw-register';
 
 export const metadata: Metadata = {
   applicationName: siteConfig.name,
@@ -20,6 +21,7 @@ export const metadata: Metadata = {
     'communication training',
   ],
   manifest: '/manifest.webmanifest',
+  icons: { apple: '/icon-512.png' },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
@@ -41,6 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className={cn('min-h-screen bg-background text-foreground antialiased')}>
+        <SwRegister />
         {children}
       </body>
     </html>

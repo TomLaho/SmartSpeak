@@ -157,8 +157,11 @@ function scoreFillers(text: string, words: number, audio: AudioMetrics): Dimensi
   if (!speakingMin && words < 5) {
     return dim('fillers', 70, 'Speak a little more to measure filler words.', false);
   }
-  // Rate per minute of speaking time so it works with or without a transcript.
-  const perMin = speakingMin ? total / speakingMin : (total / Math.max(1, words)) * 130;
+  // Without real speaking-time data we can't compute a meaningful per-minute rate.
+  if (!speakingMin) {
+    return dim('fillers', 70, 'No audio timing — record a take to measure filler rate.', false);
+  }
+  const perMin = total / speakingMin;
   const score = clamp(100 - perMin * 6);
 
   let detail: string;
@@ -324,7 +327,7 @@ export function coachAttempt(
   const focusScores = scores.filter((s) => focus.includes(s.dimension));
   const measuredFocus = focusScores.filter((s) => s.measured);
   const base = measuredFocus.length ? measuredFocus : focusScores;
-  const overallScore = clamp(base.reduce((a, s) => a + s.score, 0) / base.length);
+  const overallScore = base.length === 0 ? 0 : clamp(base.reduce((a, s) => a + s.score, 0) / base.length);
 
   const ranked = [...scores].filter((s) => s.measured).sort((a, b) => b.score - a.score);
   const strengths = ranked.filter((s) => s.score >= 75).slice(0, 3).map((s) => s.detail);
@@ -340,7 +343,8 @@ export function coachAttempt(
   const primaryCue = weakest ? quickWinFor(weakest.dimension) : undefined;
 
   // XP: base reward scaled by performance, with a guaranteed floor for showing up.
-  const xpEarned = Math.round(exercise.xp * (0.6 + (overallScore / 100) * 0.6));
+  // Range: [0.6, 1.0] of base XP (score 0 → 60%, score 100 → 100%).
+  const xpEarned = Math.round(exercise.xp * (0.6 + (overallScore / 100) * 0.4));
 
   return { overallScore, scores, strengths, improvements, quickWin, wordCount, fillerCount, xpEarned, primaryCue, primaryDimension };
 }
