@@ -23,10 +23,10 @@ Open http://localhost:3000/train in Chrome and start a session. No environment v
 
 The trainer is a standalone, installable PWA, which is the recommended on-ramp to the Google Play Store via a **Trusted Web Activity (TWA)** — no rewrite, no React Native. Full steps are in [`RELEASE.md`](./RELEASE.md).
 
-- **Manifest** (`app/manifest.ts`) is Play-ready: `standalone` display, portrait orientation, `productivity`/`education`/`business` categories, app shortcuts, and a dedicated **maskable** icon (`public/icon-maskable.svg`) with a safe zone for Android adaptive icons.
+- **Manifest** (`app/manifest.ts`) is Play-ready: `standalone` display, portrait orientation, `productivity`/`education`/`business` categories, app shortcuts, and PNG icons at 192/512 (the 512 also serves the **maskable** purpose for Android adaptive icons).
 - **Package it:** deploy over HTTPS, then run [PWABuilder](https://www.pwabuilder.com/) (or [Bubblewrap](https://github.com/GoogleChromeLabs/bubblewrap)) against the deployed URL to emit a signed Android App Bundle (`.aab`).
 - **Verify ownership:** add the generated `assetlinks.json` to `/.well-known/` so the TWA opens without a browser URL bar.
-- **Monetisation:** a single one-time **$5 "Pro" in-app product** via Google Play Billing (Digital Goods API works inside a TWA). Free preview = the first 3 exercises; gating lives in `lib/entitlement.ts`.
+- **Monetisation:** a single one-time **$10 "Pro" in-app product** via Google Play Billing (Digital Goods API works inside a TWA). Free preview = the first 3 exercises; gating lives in `lib/entitlement.ts`.
 
 ## Project structure
 - `app/train/` the PWA trainer (home path, exercise player, progress, profile, unlock)

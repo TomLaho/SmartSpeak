@@ -3,7 +3,7 @@
 /**
  * Entitlement / monetization.
  *
- * SmartSpeak Pro is a one-time, non-consumable in-app purchase ($5) that unlocks
+ * SmartSpeak Pro is a one-time, non-consumable in-app purchase ($10) that unlocks
  * the full curriculum. Billing goes through Google Play via the TWA Digital
  * Goods API + Payment Request API — no backend, and the purchase is tied to the
  * user's Google account so it restores automatically on reinstall / new device.
@@ -20,7 +20,7 @@ const PLAY_BILLING = 'https://play.google.com/billing';
 const KEY = 'smartspeak.pro.v1';
 
 export const FREE_EXERCISE_LIMIT = 3;
-export const PRO_PRICE = '$5';
+export const PRO_PRICE = '$10';
 
 function readFlag(): boolean {
   if (typeof window === 'undefined') return false;
@@ -92,7 +92,7 @@ export async function purchasePro(): Promise<PurchaseResult> {
 
     const methodData = [{ supportedMethods: PLAY_BILLING, data: { sku: PRODUCT_ID } }];
     const request = new PaymentRequest(methodData as any, {
-      total: { label: 'SmartSpeak Pro', amount: { currency: 'USD', value: '5.00' } },
+      total: { label: 'SmartSpeak Pro', amount: { currency: 'USD', value: '10.00' } },
     });
     const response: any = await request.show();
     const token: string | undefined = response?.details?.token;

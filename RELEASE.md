@@ -2,7 +2,7 @@
 
 SmartSpeak is a PWA. We publish it to Play as a **Trusted Web Activity (TWA)** —
 a thin Android wrapper around the deployed web app — and monetize with a single
-one-time **$5 in-app product** ("Pro") via **Google Play Billing**.
+one-time **$10 in-app product** ("Pro") via **Google Play Billing**.
 
 > Free preview: the first **3 distinct exercises** are free; the rest require Pro.
 > Gating lives in `lib/entitlement.ts` (`FREE_EXERCISE_LIMIT`). Billing uses the
@@ -69,7 +69,7 @@ App signing key certificate → SHA-256*):
 Play Console → *Monetize → Products → In-app products → Create*:
 - **Product ID:** `pro_unlock`  ← must match `PRODUCT_ID` in `lib/entitlement.ts`
 - **Type:** one-time (non-consumable)
-- **Price:** $5.00 (Play auto-localizes)
+- **Price:** $10.00 (Play auto-localizes)
 - Activate it.
 
 Add **license testers** (Play Console → *Setup → License testing*) so you can test
@@ -112,7 +112,7 @@ the purchase without being charged.
 | Item | Cost |
 |---|---|
 | Play Developer account | **$25 once** |
-| Google fee per sale | 15% of $5 (small-business rate) |
+| Google fee per sale | 15% of $10 (small-business rate) |
 | Transcription / AI | **$0** (on-device) |
 | Backend | **$0** (none required) |
 | Hosting | your PWA host |
@@ -138,10 +138,11 @@ the purchase without being charged.
       sole transcription path, so "your voice never leaves the device" is now literally true.
 
 ### Still on you before submission
-- [ ] **Standard PNG icons.** `public/icon-512.png` is actually 607×607. Generate a
-      true **512×512** and **192×192** PNG, plus a **512×512 maskable PNG** (content in
-      the inner 80% safe zone), and add them to the manifest. PWABuilder/Bubblewrap
-      rasterise icons more reliably from PNGs than from the current maskable SVG.
+- [x] **Standard PNG icons** — done. `public/icon-512.png` (512×512) and
+      `public/icon-192.png` (192×192) are the new brand mark and wired into the manifest;
+      the 512 also serves the `maskable` purpose. When you run PWABuilder/Bubblewrap,
+      eyeball the maskable preview — if the white mark clips under the launcher's circle
+      crop, export a dedicated maskable PNG with more padding (content in the inner 80%).
 - [ ] **`assetlinks.json`** — not in the repo yet; add it under `public/.well-known/`
       with the Play App Signing SHA-256 (step 2) or the TWA will show the URL bar.
 - [ ] **Microphone permission in the TWA** — tick "Microphone" during `bubblewrap init`
@@ -152,7 +153,7 @@ the purchase without being charged.
 
 ### Known limitation — accepted by design (zero-backend)
 - The **Pro unlock is a client-side check** (`localStorage` + the Play Digital Goods
-  API on cold start). A technical user can set the flag via devtools to bypass the $5
+  API on cold start). A technical user can set the flag via devtools to bypass the $10
   gate. Hardening this to be tamper-proof requires a small backend (a serverless
   function calling the Play Developer API to verify/acknowledge purchases) — which
   trades off the "$0 ongoing / no backend" model. Left as a deliberate decision; revisit
