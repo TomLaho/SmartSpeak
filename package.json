@@ -4,40 +4,22 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:generate": "prisma generate",
-    "prisma:seed": "prisma db seed",
-    "worker": "ts-node worker/queue-worker.ts"
+    "lint": "next lint"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.637.0",
-    "@aws-sdk/s3-request-presigner": "^3.637.0",
-    "@clerk/nextjs": "^5.4.0",
     "@heroicons/react": "^2.1.5",
-    "@prisma/client": "^5.16.1",
-    "@radix-ui/react-dialog": "^1.0.5",
-    "@radix-ui/react-dropdown-menu": "^2.0.6",
     "@radix-ui/react-slot": "^1.0.2",
     "@xenova/transformers": "^2.17.2",
-    "bullmq": "^5.9.1",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
-    "dotenv": "^16.4.5",
-    "lodash": "^4.17.21",
     "next": "^14.2.4",
-    "openai": "^4.56.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "stripe": "^14.25.0",
-    "swr": "^2.2.5",
-    "tailwind-merge": "^2.5.2",
-    "zod": "^3.23.8"
+    "tailwind-merge": "^2.5.2"
   },
   "devDependencies": {
-    "@types/lodash": "^4.17.7",
     "@types/node": "^20.14.12",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
@@ -45,10 +27,8 @@
     "eslint": "^8.57.0",
     "eslint-config-next": "^14.2.4",
     "postcss": "^8.4.41",
-    "prisma": "^5.16.1",
     "tailwindcss": "^3.4.10",
     "tailwindcss-animate": "^1.0.7",
-    "ts-node": "^10.9.2",
     "typescript": "^5.5.4"
   }
 }
