@@ -88,29 +88,28 @@ function clamp(n: number, lo = 0, hi = 100): number {
 // ─────────────────────────── Delivery scorers ───────────────────────────
 
 function scorePace(audio: AudioMetrics): DimensionScore {
-  // Prefer exact word-based pace when a transcript is available; otherwise use
-  // the transcript-free estimate derived from the audio's syllable rate.
-  const exact = audio.articulationWpm ?? audio.wpm;
-  const wpm = exact ?? audio.estimatedWpm;
+  // Prefer the transcript-independent syllable-rate estimate: it's bounded by the
+  // audio and immune to speech-to-text over-counting (which can report absurd
+  // word rates on short clips). Fall back to word-based pace only if needed.
+  const wpm = audio.estimatedWpm ?? audio.articulationWpm ?? audio.wpm;
   if (!wpm) {
     return dim('pace', 70, 'Speak a little longer so we can measure your pace from the audio.', false);
   }
-  const src = exact ? '' : ' (estimated from your audio)';
   const score = bell(wpm, 145, 75);
   let detail: string;
-  if (wpm < 110) detail = `~${wpm} wpm${src} — a touch slow. A little more momentum keeps the energy up.`;
-  else if (wpm > 185) detail = `~${wpm} wpm${src} — quite fast. Slow down ~10% so each point can land.`;
-  else detail = `~${wpm} wpm${src} — right in the confident, easy-to-follow zone.`;
+  if (wpm < 110) detail = `~${wpm} wpm — a touch slow. A little more momentum keeps the energy up.`;
+  else if (wpm > 185) detail = `~${wpm} wpm — quite fast. Slow down ~10% so each point can land.`;
+  else detail = `~${wpm} wpm — right in the confident, easy-to-follow zone.`;
   return dim('pace', score, detail, true);
 }
 
 function scorePauses(audio: AudioMetrics): DimensionScore {
   if (audio.unavailable) return dim('pauses', 70, 'Pause analysis needs the audio recording.', false);
   const ppm = audio.pausesPerMin;
-  const score = bell(ppm, 9, 9);
+  const score = bell(ppm, 10, 12);
   let detail: string;
   if (ppm < 3) detail = `Only ${audio.pauseCount} clear pause(s). Build in silence before key points.`;
-  else if (ppm > 18) detail = `Lots of pausing (${ppm}/min). Some hesitation — try shorter, more deliberate breaks.`;
+  else if (ppm > 20) detail = `Lots of pausing (${ppm}/min). Some hesitation — try shorter, more deliberate breaks.`;
   else detail = `${audio.pauseCount} well-placed pauses. Nice use of silence to shape your delivery.`;
   if (audio.longPauseCount >= 3) detail += ` (${audio.longPauseCount} long gaps — keep them intentional.)`;
   return dim('pauses', score, detail, true);
