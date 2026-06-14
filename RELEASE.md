@@ -120,9 +120,11 @@ the purchase without being charged.
 ## Code to finalize before publishing
 - [ ] `app/privacy/page.tsx` & `app/terms/page.tsx` — set the real **contact email**
       (placeholder: `support@smartspeak.app`).
-- [ ] **Self-host the speech model** for reliability: today `lib/transcribe.worker.ts`
-      pulls `Xenova/whisper-tiny.en` from the HF CDN. For production, host the model
-      on your domain and set `env.localModelPath` / `env.remoteHost` accordingly.
+- [x] **Self-host the speech model** — done. The quantized `Xenova/whisper-tiny.en`
+      weights live in `public/models/Xenova/whisper-tiny.en/` and are served from our
+      own origin; `lib/transcribe.worker.ts` sets `env.allowLocalModels = true`,
+      `env.allowRemoteModels = false`, `env.localModelPath = '/models/'`. No HF CDN
+      dependency at runtime.
 - [ ] Confirm the purchase **acknowledgement** path (see step 3).
 - [ ] (Optional) enable WASM threads (COOP/COEP headers) or WebGPU to speed up
       first-time transcription on mobile.

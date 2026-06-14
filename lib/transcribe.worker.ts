@@ -9,9 +9,12 @@
  */
 import { pipeline, env, type Pipeline } from '@xenova/transformers';
 
-// No local model files; single-threaded WASM so we don't require cross-origin
-// isolation (COOP/COEP) headers to run.
-env.allowLocalModels = false;
+// Self-hosted model: weights are served from our own origin (public/models/...)
+// so first-time transcription never depends on the HF CDN. Single-threaded WASM
+// so we don't require cross-origin isolation (COOP/COEP) headers to run.
+env.allowLocalModels = true;
+env.allowRemoteModels = false;
+env.localModelPath = '/models/';
 if (env.backends?.onnx?.wasm) env.backends.onnx.wasm.numThreads = 1;
 
 const MODEL = 'Xenova/whisper-tiny.en';
