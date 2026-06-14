@@ -21,6 +21,8 @@ export interface DimensionScore {
   score: number; // 0-100
   detail: string;
   measured: boolean; // false when we lacked data (e.g. no transcript)
+  /** Performance tier derived from score: >=75 green, 55–74 amber, <55 red. */
+  tier?: 'green' | 'amber' | 'red';
 }
 
 export interface CoachResult {
@@ -33,6 +35,13 @@ export interface CoachResult {
   /** Combined acoustic hesitations + lexical fillers. */
   fillerCount: number;
   xpEarned: number;
+  /**
+   * The single most important next-rep instruction (deliberate-practice
+   * "one thing" rule) — same text as quickWin but surfaced explicitly.
+   */
+  primaryCue?: string;
+  /** Which dimension the primaryCue addresses. */
+  primaryDimension?: Dimension;
 }
 
 // Non-vocalised fillers we can only catch in the transcript. The vocalised
@@ -259,7 +268,9 @@ function scoreConcreteness(text: string): DimensionScore {
 }
 
 function dim(dimension: Dimension, score: number, detail: string, measured: boolean): DimensionScore {
-  return { dimension, label: DIMENSION_LABELS[dimension], score: clamp(score), detail, measured };
+  const s = clamp(score);
+  const tier: 'green' | 'amber' | 'red' = s >= 75 ? 'green' : s >= 55 ? 'amber' : 'red';
+  return { dimension, label: DIMENSION_LABELS[dimension], score: s, detail, measured, tier };
 }
 
 // ─────────────────────────────── Compose ───────────────────────────────
@@ -267,7 +278,8 @@ function dim(dimension: Dimension, score: number, detail: string, measured: bool
 export function coachAttempt(
   exercise: Exercise,
   transcript: string,
-  audio: AudioMetrics
+  audio: AudioMetrics,
+  previous?: Partial<Record<Dimension, number>>
 ): CoachResult {
   const text = transcript.trim();
   const words = tokenize(text);
@@ -294,6 +306,21 @@ export function coachAttempt(
   const extras = (Object.keys(all) as Dimension[]).filter((d) => !focus.includes(d));
   const scores = [...focus, ...extras].map((d) => all[d]());
 
+  // Append personal-baseline delta to each measured dimension's detail when
+  // the change from the previous attempt is >=5 points (informative, not noisy).
+  if (previous) {
+    for (const ds of scores) {
+      const prev = previous[ds.dimension];
+      if (ds.measured && typeof prev === 'number') {
+        const delta = ds.score - prev;
+        if (Math.abs(delta) >= 5) {
+          const sign = delta > 0 ? 'up' : 'down';
+          ds.detail += ` (${sign} ${Math.abs(delta)} from last time)`;
+        }
+      }
+    }
+  }
+
   // Overall = weighted toward the exercise's focus dimensions.
   const focusScores = scores.filter((s) => focus.includes(s.dimension));
   const measuredFocus = focusScores.filter((s) => s.measured);
@@ -309,10 +336,14 @@ export function coachAttempt(
   const weakest = ranked.length ? ranked[ranked.length - 1] : focusScores[0];
   const quickWin = weakest ? quickWinFor(weakest.dimension) : 'Record one more take and compare your scores.';
 
+  // "One thing" — the single deliberate-practice cue for the next rep.
+  const primaryDimension = weakest?.dimension;
+  const primaryCue = weakest ? quickWinFor(weakest.dimension) : undefined;
+
   // XP: base reward scaled by performance, with a guaranteed floor for showing up.
   const xpEarned = Math.round(exercise.xp * (0.6 + (overallScore / 100) * 0.6));
 
-  return { overallScore, scores, strengths, improvements, quickWin, wordCount, fillerCount, xpEarned };
+  return { overallScore, scores, strengths, improvements, quickWin, wordCount, fillerCount, xpEarned, primaryCue, primaryDimension };
 }
 
 function quickWinFor(d: Dimension): string {

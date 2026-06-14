@@ -3,30 +3,41 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { isSpeechRecognitionSupported } from '@/lib/speech-recognition';
-import { loadProgress, resetProgress, type Progress } from '@/lib/local-store';
+import { loadProgress, resetProgress, loadDailyGoalReps, saveDailyGoalReps, type Progress } from '@/lib/local-store';
 import { isProCached, refreshEntitlement, PRO_PRICE } from '@/lib/entitlement';
 import { Button } from '@/components/ui/button';
 import { MicCalibration } from '@/components/train/mic-calibration';
+import { cn } from '@/lib/utils';
+
+const REP_OPTIONS = [1, 2, 3] as const;
 
 export default function ProfilePage() {
   const [progress, setProgress] = useState<Progress | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [speech, setSpeech] = useState<boolean | null>(null);
   const [pro, setPro] = useState(false);
+  const [dailyGoalReps, setDailyGoalReps] = useState<number>(1);
 
   useEffect(() => {
     setProgress(loadProgress());
     setSpeech(isSpeechRecognitionSupported());
     setPro(isProCached());
     refreshEntitlement().then(setPro);
+    setDailyGoalReps(loadDailyGoalReps());
   }, []);
+
+  function handleGoalChange(n: number) {
+    saveDailyGoalReps(n);
+    setDailyGoalReps(n);
+  }
 
   return (
     <div className="px-5 pb-8 pt-6">
       <h1 className="mb-5 text-2xl font-bold">Profile</h1>
 
-      <div className="mb-6 flex items-center gap-4 rounded-3xl border border-white/10 bg-white/5 p-5">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-blue-600 text-2xl">
+      {/* Identity card */}
+      <div className="mb-6 flex items-center gap-4 rounded-3xl border border-white/10 bg-white/[0.05] p-5">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-spotlight/40 to-spotlight/10 text-2xl">
           🗣️
         </div>
         <div>
@@ -37,14 +48,44 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/60">
+      {/* Daily goal selector */}
+      <div className="mb-6 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+        <p className="mb-3 font-semibold text-white/80">Daily goal</p>
+        <div className="flex gap-2">
+          {REP_OPTIONS.map((n) => (
+            <button
+              key={n}
+              onClick={() => handleGoalChange(n)}
+              aria-pressed={dailyGoalReps === n}
+              className={cn(
+                'flex h-11 flex-1 items-center justify-center rounded-xl text-sm font-semibold transition-colors',
+                dailyGoalReps === n
+                  ? 'bg-spotlight text-ink'
+                  : 'bg-white/10 text-white/60 hover:bg-white/15 hover:text-white/80'
+              )}
+            >
+              {n} rep{n === 1 ? '' : 's'}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2.5 text-xs text-white/35">
+          {dailyGoalReps === 1
+            ? 'One rep a day builds the habit.'
+            : dailyGoalReps === 2
+            ? 'Two reps accelerates your improvement.'
+            : 'Three reps per day is serious training.'}
+        </p>
+      </div>
+
+      {/* Privacy note */}
+      <div className="mb-6 rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-white/60">
         <p className="font-semibold text-white/80">🔒 Private by design</p>
         <p className="mt-1">
           You&apos;re practising with <span className="text-white/80">no account and no server</span>. Your voice is
           analysed entirely on your device and never uploaded — your progress is saved privately in this browser.
         </p>
         <p className="mt-2">
-          Transcription runs <span className="text-green-300">on-device</span> — your words are transcribed from the
+          Transcription runs <span className="text-stage">on-device</span> — your words are transcribed from the
           recording locally{speech ? ', with live captions while you speak.' : ' (a small speech model downloads once, then works offline).'}
         </p>
       </div>
@@ -52,7 +93,7 @@ export default function ProfilePage() {
       <MicCalibration />
 
       {/* Pro / unlock */}
-      <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+      <div className="mb-6 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="font-semibold text-white/80">{pro ? '✓ SmartSpeak Pro' : 'SmartSpeak Pro'}</p>
@@ -63,14 +104,14 @@ export default function ProfilePage() {
             </p>
           </div>
           {pro && (
-            <span className="shrink-0 rounded-full bg-green-500/15 px-2.5 py-1 text-xs font-semibold text-green-300">
+            <span className="shrink-0 rounded-full bg-stage/15 px-2.5 py-1 text-xs font-semibold text-stage">
               Unlocked
             </span>
           )}
         </div>
         {!pro && (
           <div className="mt-3 flex gap-2">
-            <Button asChild className="h-10 rounded-xl bg-violet-600 hover:bg-violet-500">
+            <Button asChild className="h-10 rounded-xl bg-spotlight text-ink hover:bg-spotlight/90">
               <Link href="/train/unlock">Unlock {PRO_PRICE}</Link>
             </Button>
             <Button
@@ -84,6 +125,7 @@ export default function ProfilePage() {
         )}
       </div>
 
+      {/* Navigation links */}
       <div className="space-y-3">
         <Button asChild variant="secondary" className="h-12 w-full justify-between rounded-2xl bg-white/10 hover:bg-white/20">
           <Link href="/train">

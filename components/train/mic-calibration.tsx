@@ -48,13 +48,13 @@ export function MicCalibration() {
       </div>
 
       {recording ? (
-        <div className="mt-3 flex items-center gap-3 rounded-xl bg-violet-500/10 p-3">
-          <span className="h-3 w-3 animate-pulse rounded-full bg-violet-400" />
+        <div className="mt-3 flex items-center gap-3 rounded-xl bg-spotlight/10 p-3">
+          <span className="h-3 w-3 animate-pulse rounded-full bg-spotlight" />
           <p className="text-sm text-white/75">Listening… speak normally for 2 seconds.</p>
         </div>
       ) : (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button onClick={run} className="h-10 rounded-xl bg-violet-600 hover:bg-violet-500">
+          <Button onClick={run} className="h-10 rounded-xl bg-spotlight text-ink hover:bg-spotlight-soft">
             {profile ? 'Re-calibrate' : 'Calibrate now'}
           </Button>
           {profile && (

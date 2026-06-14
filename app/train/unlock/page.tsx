@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { LogoMark } from '@/components/brand/logo';
+import { EXERCISES } from '@/lib/exercises';
 import {
   PRO_PRICE,
   isProCached,
@@ -14,7 +15,7 @@ import {
 } from '@/lib/entitlement';
 
 const PERKS = [
-  'All 15 work-scenario reps across Delivery, Structure and Influence',
+  `All ${EXERCISES.length} work-scenario reps across Delivery, Structure and Influence`,
   'Self-review playback with the delivery timeline',
   'On-device coaching on pace, pauses, tone, volume & fillers',
   'Keep your streak, XP and full progress history',
@@ -60,7 +61,7 @@ export default function UnlockPage() {
     <div className="flex min-h-[100dvh] flex-col px-6 pb-10 pt-10">
       <div className="flex flex-1 flex-col items-center text-center">
         <LogoMark size={56} className="rounded-[24%]" />
-        <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-violet-300">SmartSpeak Pro</p>
+        <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-spotlight">SmartSpeak Pro</p>
         <h1 className="mt-1 text-3xl font-bold leading-tight">Unlock the full coach</h1>
         <p className="mt-2 max-w-sm text-white/60">
           You&apos;ve used your free practice reps. Unlock every scenario and keep training for your real meetings.
@@ -69,7 +70,7 @@ export default function UnlockPage() {
         <ul className="mt-7 w-full max-w-sm space-y-3 text-left">
           {PERKS.map((perk) => (
             <li key={perk} className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-500/20 text-xs text-violet-300">
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-spotlight/20 text-xs text-spotlight">
                 ✓
               </span>
               <span className="text-sm text-white/75">{perk}</span>
@@ -77,7 +78,7 @@ export default function UnlockPage() {
           ))}
         </ul>
 
-        <div className="mt-8 w-full max-w-sm rounded-2xl border border-violet-400/30 bg-violet-500/10 p-4">
+        <div className="mt-8 w-full max-w-sm rounded-2xl border border-spotlight/30 bg-spotlight/10 p-4">
           <p className="text-2xl font-bold">
             {PRO_PRICE} <span className="text-sm font-normal text-white/55">· one-time · yours forever</span>
           </p>
@@ -97,7 +98,7 @@ export default function UnlockPage() {
           onClick={unlock}
           disabled={busy}
           size="lg"
-          className="h-14 w-full rounded-2xl bg-violet-600 text-base hover:bg-violet-500 disabled:opacity-60"
+          className="h-14 w-full rounded-2xl bg-spotlight text-ink text-base font-semibold hover:bg-spotlight-soft disabled:opacity-60"
         >
           {busy ? 'Please wait…' : `Unlock for ${PRO_PRICE}`}
         </Button>

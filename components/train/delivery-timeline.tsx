@@ -104,7 +104,7 @@ export function DeliveryTimeline({
         <button
           onClick={toggle}
           aria-label={playing ? 'Pause' : 'Play'}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-violet-600 text-base hover:bg-violet-500"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-spotlight text-ink text-base hover:bg-spotlight-soft"
         >
           {playing ? '❚❚' : '▶'}
         </button>
