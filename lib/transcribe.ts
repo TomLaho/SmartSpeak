@@ -99,6 +99,7 @@ export async function transcribeOnDevice(
         resolve(String(m.text ?? '').trim());
       } else if (m.type === 'error') {
         cleanup();
+        resetWorker(); // broken ONNX/OOM state — don't reuse this worker
         reject(new Error(m.message || 'transcription failed'));
       }
     };

@@ -60,7 +60,11 @@ const EMPTY: Progress = {
 };
 
 function dayKey(d = new Date()): string {
-  return d.toISOString().slice(0, 10);
+  // Use local calendar date so streaks/daily-goal are correct for non-UTC users (e.g. AEST UTC+10/+11).
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function daysBetween(a: string, b: string): number {
@@ -74,23 +78,33 @@ export function loadProgress(): Progress {
     const raw = window.localStorage.getItem(KEY);
     if (!raw) return { ...EMPTY };
     const parsed = { ...EMPTY, ...(JSON.parse(raw) as Progress) };
+    // Defensive clamps against corrupt numeric fields.
+    if (!isFinite(parsed.xp) || parsed.xp < 0) parsed.xp = 0;
+    if (!isFinite(parsed.todayXp) || parsed.todayXp < 0) parsed.todayXp = 0;
+    if (!isFinite(parsed.streak) || parsed.streak < 0) parsed.streak = 0;
     // Reset the daily counter if it belongs to a previous day.
     if (parsed.todayDay !== dayKey()) {
       parsed.todayXp = 0;
       parsed.todayDay = dayKey();
     }
     // Streak break / grace logic — evaluated once on load so reads are always consistent.
+    let mutated = false;
     if (parsed.lastPracticeDay) {
       const gap = daysBetween(parsed.lastPracticeDay, dayKey());
       if (gap > 1) {
         // Gap of exactly 2 days: apply a grace day if available (one per 7 days).
         if (gap === 2 && canUseGrace(parsed)) {
           parsed.graceUsedDay = dayKey();
+          mutated = true;
         } else {
           parsed.streak = 0;
+          mutated = true;
         }
       }
     }
+    // Persist any streak/grace mutations so a second loadProgress call in the same
+    // session doesn't re-evaluate from stale storage (double-grace / stale-streak race).
+    if (mutated) save(parsed);
     return parsed;
   } catch {
     return { ...EMPTY };
@@ -196,11 +210,14 @@ export const dailyGoalXp = DAILY_GOAL_XP;
  * Returns the last `n` (default 7) scores for a dimension from history,
  * oldest → newest, suitable for a sparkline chart.
  */
-export function dimensionTrend(progress: Progress, dimension: string, n = 7): number[] {
+export function dimensionTrend(progress: Progress, dimension: string, n = 7, exerciseId?: string): number[] {
   const scores: number[] = [];
   // history is stored newest-first; iterate in reverse to get oldest-first output.
   for (let i = progress.history.length - 1; i >= 0; i--) {
-    const dims = progress.history[i].dims;
+    const entry = progress.history[i];
+    // When exerciseId is provided, restrict to that exercise only.
+    if (exerciseId !== undefined && entry.exerciseId !== exerciseId) continue;
+    const dims = entry.dims;
     if (dims && typeof dims[dimension] === 'number') {
       scores.push(dims[dimension] as number);
     }
@@ -258,9 +275,11 @@ export function levelFor(xp: number): {
   xpIntoLevel: number;
   xpForNext: number;
 } {
+  // Guard against corrupt/Infinity xp so the while loop can't hang the tab.
+  const safeXp = isFinite(xp) && xp >= 0 ? xp : 0;
   let level = 1;
-  while (xpForLevel(level + 1) <= xp) level++;
-  const xpIntoLevel = xp - xpForLevel(level);
+  while (level < 1000 && xpForLevel(level + 1) <= safeXp) level++;
+  const xpIntoLevel = safeXp - xpForLevel(level);
   const xpForNext = xpForLevel(level + 1) - xpForLevel(level);
   return { level, title: titleFor(level), xpIntoLevel, xpForNext };
 }

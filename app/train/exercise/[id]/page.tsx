@@ -19,7 +19,8 @@ import {
   type Progress,
 } from '@/lib/local-store';
 import { evaluateAchievements, ACHIEVEMENTS, type Achievement } from '@/lib/achievements';
-import { createTranscriber, isSpeechRecognitionSupported, type LiveTranscriber } from '@/lib/speech-recognition';
+// lib/speech-recognition is no longer imported: on-device Whisper (transcribeOnDevice)
+// is now the sole transcription path so audio never leaves the device.
 import { haptic } from '@/lib/haptics';
 import { Ring } from '@/components/train/ring';
 import { Sparkline } from '@/components/train/sparkline';
@@ -70,20 +71,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const rafRef = useRef<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const transcriberRef = useRef<LiveTranscriber | null>(null);
   const transcriptRef = useRef('');
-  const sttDiagRef = useRef<{ audioStarted: boolean; gotResult: boolean; error: string | null }>({
-    audioStarted: false,
-    gotResult: false,
-    error: null,
-  });
-
-  // Start false so the server and the first client render agree; resolve the
-  // real (browser-only) capability after mount to avoid a hydration mismatch.
-  const [speechSupported, setSpeechSupported] = useState(false);
-  useEffect(() => {
-    setSpeechSupported(isSpeechRecognitionSupported());
-  }, []);
 
   // Load persisted challenge + default to exercise's primary focus on mount.
   useEffect(() => {
@@ -111,7 +99,6 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
   const cleanup = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
-    transcriberRef.current?.stop();
     audioCtxRef.current?.close().catch(() => {});
     streamRef.current?.getTracks().forEach((t) => t.stop());
     rafRef.current = null;
@@ -139,11 +126,12 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     async (blob: Blob) => {
       if (!exercise) return;
       setPhase('analyzing');
-      let text = transcriptRef.current.trim();
+      let text = '';
+      let transcriptionError: string | null = null;
 
-      // No live transcript (the norm on Android) → transcribe the recorded clip
-      // on-device. No mic contention, no upload, no backend.
-      if (!text && isOnDeviceTranscriptionSupported()) {
+      // On-device Whisper is the sole transcription path on all platforms —
+      // audio never leaves the device.
+      if (isOnDeviceTranscriptionSupported()) {
         try {
           setTranscribeStatus({ stage: 'loading' });
           text = (await transcribeOnDevice(blob, (p) => setTranscribeStatus(p))).trim();
@@ -152,7 +140,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
             setTranscript(text);
           }
         } catch (err: any) {
-          sttDiagRef.current.error = sttDiagRef.current.error || `on-device transcription: ${err?.message ?? 'failed'}`;
+          transcriptionError = `on-device transcription: ${err?.message ?? 'failed'}`;
         } finally {
           setTranscribeStatus(null);
         }
@@ -160,10 +148,9 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
 
       const wordCount = text ? text.split(/\s+/).filter(Boolean).length : undefined;
       if (!wordCount) {
-        const d = sttDiagRef.current;
         setTranscriptionDiag(
-          d.error
-            ? `transcription error: ${d.error}`
+          transcriptionError
+            ? `transcription error: ${transcriptionError}`
             : !isOnDeviceTranscriptionSupported()
             ? 'this browser cannot run on-device transcription'
             : 'we could not make out any speech in the recording'
@@ -243,37 +230,24 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     transcriptRef.current = '';
     setSeconds(0);
     chunksRef.current = [];
-    // Best-effort live transcription, started *synchronously* inside the tap
-    // handler (Android Chrome blocks SpeechRecognition.start() once the user
-    // gesture is consumed by `await getUserMedia`). Where it works (e.g. desktop
-    // Chrome) we get an instant transcript; otherwise we transcribe the recorded
-    // clip on-device after the take. Lifecycle is captured for diagnostics.
-    sttDiagRef.current = { audioStarted: false, gotResult: false, error: null };
-    const transcriber = createTranscriber({
-      onTranscript: (text) => {
-        transcriptRef.current = text;
-        setTranscript(text);
-        if (text) sttDiagRef.current.gotResult = true;
-      },
-      onStatus: (s) => {
-        if (s === 'audiostart') sttDiagRef.current.audioStarted = true;
-        else if (s === 'result') sttDiagRef.current.gotResult = true;
-        else if (s.startsWith('error:')) sttDiagRef.current.error = s.slice(6);
-      },
-    });
-    transcriberRef.current = transcriber;
-    transcriber?.start();
+
+    // Pick the first MIME type the browser supports for best cross-platform compat.
+    const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'].find(
+      (t) => (MediaRecorder as any).isTypeSupported?.(t)
+    );
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
-      // Recorder
-      const recorder = new MediaRecorder(stream);
+      // Recorder — use negotiated mimeType so Safari/iOS and some Android WebViews
+      // can decode the blob in decodeAudioData.
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       recorderRef.current = recorder;
       recorder.ondataavailable = (e) => e.data.size > 0 && chunksRef.current.push(e.data);
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        const blobType = mimeType || recorder.mimeType || 'audio/webm';
+        const blob = new Blob(chunksRef.current, { type: blobType });
         setAudioUrl(URL.createObjectURL(blob));
         void finishAnalysis(blob);
       };
@@ -282,6 +256,8 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
       // Live level meter
       const Ctx: typeof AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
       const audioCtx = new Ctx();
+      // iOS suspends AudioContext until resumed inside a user-gesture handler.
+      if (audioCtx.state === 'suspended') audioCtx.resume();
       audioCtxRef.current = audioCtx;
       const source = audioCtx.createMediaStreamSource(stream);
       const analyser = audioCtx.createAnalyser();
@@ -302,11 +278,20 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
 
       timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
       setPhase('recording');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      transcriber?.stop();
-      transcriberRef.current = null;
-      setError('Microphone access is required. Please allow it and try again.');
+      const name = err?.name ?? '';
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        setError(
+          "Microphone access is blocked. Enable it in your phone's Settings → Apps → SmartSpeak → Permissions → Microphone, then try again."
+        );
+      } else if (name === 'NotFoundError') {
+        setError('No microphone was found on this device.');
+      } else if (name === 'NotReadableError') {
+        setError('Your microphone is in use by another app. Close it and try again.');
+      } else {
+        setError('Microphone access is required. Please allow it and try again.');
+      }
     }
   }, [finishAnalysis]);
 
@@ -314,7 +299,6 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
     setLevel(0);
-    transcriberRef.current?.stop();
     recorderRef.current?.stop(); // triggers onstop → finishAnalysis
     streamRef.current?.getTracks().forEach((t) => t.stop());
     audioCtxRef.current?.close().catch(() => {});
@@ -386,7 +370,6 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
           exercise={exercise}
           onStart={startRecording}
           error={error}
-          speechSupported={speechSupported}
           challenge={challenge}
           onChallengeChange={(dim) => {
             setChallenge(dim);
@@ -447,7 +430,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
           onRescore={rescore}
           onRetry={retry}
           onDone={() => router.push('/train')}
-          editable={transcript.trim().length > 0 || speechSupported}
+          editable={transcript.trim().length > 0}
           postRecordProgress={postRecordProgress}
           exercise={exercise}
           celebrationShow={celebrationShow}
@@ -466,7 +449,6 @@ function IntroView({
   exercise,
   onStart,
   error,
-  speechSupported,
   challenge,
   onChallengeChange,
   activePrompt,
@@ -475,7 +457,6 @@ function IntroView({
   exercise: Exercise;
   onStart: () => void;
   error: string | null;
-  speechSupported: boolean;
   challenge: Dimension | null;
   onChallengeChange: (dim: Dimension) => void;
   activePrompt: string | undefined;
@@ -575,13 +556,7 @@ function IntroView({
           </ul>
         </div>
 
-        {!speechSupported && (
-          <p className="rounded-xl bg-white/[0.04] p-3 text-xs text-white/45">
-            Heads up: live transcription isn&apos;t available in this browser (try Chrome). Your delivery — pace,
-            pauses, intonation, energy — is still measured from the audio, and you can type what you said afterwards
-            for structure &amp; content feedback.
-          </p>
-        )}
+
       </div>
 
       {error && <p className="mt-3 text-sm text-tier-red">{error}</p>}
@@ -807,7 +782,7 @@ function ResultsView({
           <div className="space-y-2.5">
             {result.scores.map((s) => {
               const trend = postRecordProgress
-                ? dimensionTrend(postRecordProgress, s.dimension)
+                ? dimensionTrend(postRecordProgress, s.dimension, 7, exercise.id)
                 : [];
               const hasTrend = trend.length >= 2;
               const barColor =

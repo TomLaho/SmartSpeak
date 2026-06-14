@@ -119,12 +119,43 @@ the purchase without being charged.
 
 ## Code to finalize before publishing
 - [ ] `app/privacy/page.tsx` & `app/terms/page.tsx` — set the real **contact email**
-      (placeholder: `support@smartspeak.app`).
+      (placeholder: `support@smartspeak.app`). Play requires a working contact.
 - [x] **Self-host the speech model** — done. The quantized `Xenova/whisper-tiny.en`
       weights live in `public/models/Xenova/whisper-tiny.en/` and are served from our
-      own origin; `lib/transcribe.worker.ts` sets `env.allowLocalModels = true`,
-      `env.allowRemoteModels = false`, `env.localModelPath = '/models/'`. No HF CDN
-      dependency at runtime.
-- [ ] Confirm the purchase **acknowledgement** path (see step 3).
+      own origin; `lib/transcribe.worker.ts` sets `allowLocalModels = true`,
+      `allowRemoteModels = false`, `localModelPath = '/models/'`.
+- [x] **Self-host the ONNX WASM runtime** — done. `ort-wasm*.wasm` now live in
+      `public/ort/` and the worker sets `env.backends.onnx.wasm.wasmPaths = '/ort/'`.
+      Combined with the model above, there is **no CDN dependency at runtime** —
+      transcription works fully offline after the one-time download.
+- [x] **Offline / installability** — added a service worker (`public/sw.js`,
+      registered via `components/sw-register.tsx`) that precaches the app shell and
+      cache-firsts the model + WASM, so the TWA opens offline after first use.
+- [x] **Security headers** — CSP, `X-Content-Type-Options`, `Referrer-Policy`,
+      `Permissions-Policy: microphone=(self)` added in `next.config.mjs`.
+- [x] **Privacy promise honoured** — removed the browser `SpeechRecognition` path
+      (which streamed audio to Google on desktop Chrome); on-device Whisper is now the
+      sole transcription path, so "your voice never leaves the device" is now literally true.
+
+### Still on you before submission
+- [ ] **Standard PNG icons.** `public/icon-512.png` is actually 607×607. Generate a
+      true **512×512** and **192×192** PNG, plus a **512×512 maskable PNG** (content in
+      the inner 80% safe zone), and add them to the manifest. PWABuilder/Bubblewrap
+      rasterise icons more reliably from PNGs than from the current maskable SVG.
+- [ ] **`assetlinks.json`** — not in the repo yet; add it under `public/.well-known/`
+      with the Play App Signing SHA-256 (step 2) or the TWA will show the URL bar.
+- [ ] **Microphone permission in the TWA** — tick "Microphone" during `bubblewrap init`
+      (adds `RECORD_AUDIO` to `AndroidManifest.xml`); otherwise mic is blocked in the WebView.
+- [ ] **Purchase acknowledgement** (step 3) — `lib/entitlement.ts` swallows an
+      `acknowledge()` failure; if it fails, Play auto-refunds after 3 days. Confirm it
+      works in testing, or add a one-function serverless verifier (see below).
+
+### Known limitation — accepted by design (zero-backend)
+- The **Pro unlock is a client-side check** (`localStorage` + the Play Digital Goods
+  API on cold start). A technical user can set the flag via devtools to bypass the $5
+  gate. Hardening this to be tamper-proof requires a small backend (a serverless
+  function calling the Play Developer API to verify/acknowledge purchases) — which
+  trades off the "$0 ongoing / no backend" model. Left as a deliberate decision; revisit
+  if piracy actually shows up in the numbers.
 - [ ] (Optional) enable WASM threads (COOP/COEP headers) or WebGPU to speed up
       first-time transcription on mobile.
