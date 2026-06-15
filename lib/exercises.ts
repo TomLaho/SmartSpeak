@@ -735,8 +735,155 @@ export const EXERCISES: Exercise[] = [
 export const exercisesByTrack = (track: TrackId): Exercise[] =>
   EXERCISES.filter((e) => e.track === track).sort((a, b) => a.order - b.order);
 
-export const getExercise = (id: string): Exercise | undefined =>
-  EXERCISES.find((e) => e.id === id);
+// ─────────────────────────── Learning Modules ────────────────────────────
+
+export type ModuleId =
+  | 'command-presence'
+  | 'confident-voice'
+  | 'cut-through'
+  | 'great-explainer'
+  | 'storyteller'
+  | 'persuader'
+  | 'grace-under-fire'
+  | 'the-closer';
+
+export interface LearningModule {
+  id: ModuleId;
+  order: number;
+  name: string;
+  blurb: string;
+  emoji: string;
+  gradient: string;
+  accent: string;
+  exerciseIds: string[];
+}
+
+export const MODULES: LearningModule[] = [
+  {
+    id: 'command-presence',
+    order: 1,
+    name: 'Command Presence',
+    blurb: 'Own the room the moment you open your mouth — steady pace, deliberate pauses, pure authority.',
+    emoji: '🎙️',
+    gradient: 'from-rose-500 to-orange-500',
+    accent: '#FB7185',
+    exerciseIds: ['d1-pace', 'd2-pause', 'd5-presence'],
+  },
+  {
+    id: 'confident-voice',
+    order: 2,
+    name: 'The Confident Voice',
+    blurb: 'Trade nerves for control — no fillers, no monotone, just a voice people lean in to hear.',
+    emoji: '🎚️',
+    gradient: 'from-amber-500 to-orange-600',
+    accent: '#FBBF24',
+    exerciseIds: ['d3-fillers', 'd4-emphasis', 'd6-vocal-variety'],
+  },
+  {
+    id: 'cut-through',
+    order: 3,
+    name: 'Cut Through the Noise',
+    blurb: 'Say the one thing that matters first — and watch a busy room actually listen.',
+    emoji: '✂️',
+    gradient: 'from-sky-500 to-cyan-600',
+    accent: '#38BDF8',
+    exerciseIds: ['s1-bluf', 'i1-execsummary', 's5-onebigidea'],
+  },
+  {
+    id: 'great-explainer',
+    order: 4,
+    name: 'The Great Explainer',
+    blurb: "Make the complex feel simple, so smart people finally get it on the first pass.",
+    emoji: '💡',
+    gradient: 'from-violet-500 to-purple-600',
+    accent: '#A78BFA',
+    exerciseIds: ['s2-finding', 's3-simple', 's6-data-story'],
+  },
+  {
+    id: 'storyteller',
+    order: 5,
+    name: 'The Storyteller',
+    blurb: 'Turn facts into a story that carries the room from the first line to the last.',
+    emoji: '📖',
+    gradient: 'from-fuchsia-500 to-pink-600',
+    accent: '#E879F9',
+    exerciseIds: ['s4-deck', 's7-reframe', 's8-exec-narrative'],
+  },
+  {
+    id: 'persuader',
+    order: 6,
+    name: 'The Persuader',
+    blurb: 'Ask for what you need and bring people with you — clearly, and without apology.',
+    emoji: '🤝',
+    gradient: 'from-emerald-500 to-teal-600',
+    accent: '#34D399',
+    exerciseIds: ['i2-ask', 'i4-plan', 'i5-buyin'],
+  },
+  {
+    id: 'grace-under-fire',
+    order: 7,
+    name: 'Grace Under Fire',
+    blurb: 'Stay calm, composed and credible when the hard questions come.',
+    emoji: '🔥',
+    gradient: 'from-red-500 to-rose-600',
+    accent: '#F87171',
+    exerciseIds: ['i3-toughq', 'i7-negotiate', 'd8-under-pressure'],
+  },
+  {
+    id: 'the-closer',
+    order: 8,
+    name: 'The Closer',
+    blurb: "Read the room and drive it to a decision — no drifting, no 'let’s take it offline'.",
+    emoji: '🎯',
+    gradient: 'from-indigo-500 to-blue-600',
+    accent: '#818CF8',
+    exerciseIds: ['i6-stakeholder-map', 'i8-close', 'd7-cold-open'],
+  },
+];
+
+export const getModule = (id: string): LearningModule | undefined =>
+  MODULES.find((m) => m.id === id);
+
+export const exercisesByModule = (id: ModuleId): Exercise[] => {
+  const mod = MODULES.find((m) => m.id === id);
+  if (!mod) return [];
+  return mod.exerciseIds
+    .map((eid) => EXERCISES.find((e) => e.id === eid))
+    .filter((e): e is Exercise => e !== undefined);
+};
+
+/** Stable id for the free-play "Open Mic" exercise — never added to EXERCISES. */
+export const FREE_PLAY_ID = 'free-play';
+
+/** Free-play exercise object. Not in EXERCISES so it never surfaces in curriculum lists. */
+export const FREE_PLAY: Exercise = {
+  id: FREE_PLAY_ID,
+  track: 'delivery', // placeholder — not used since it's not in EXERCISES
+  order: 999,
+  level: 1,
+  title: 'Open Mic',
+  emoji: '🎤',
+  summary: 'Practice anything — your own speech, pitch or presentation. No script, no rules.',
+  type: 'topic',
+  scenario: 'Your own material',
+  targetSeconds: 120,
+  instructions: [
+    'Pick anything you want to rehearse — a real presentation, a pitch, or just freestyle.',
+    "There's no prompt and no script. Speak for as long as you like.",
+    "We'll analyse your delivery and give you the full breakdown.",
+  ],
+  focus: ['pace', 'pauses', 'intonation', 'energy', 'fillers', 'clarity', 'structure', 'concreteness'],
+  tips: [
+    'This is your space — use it for something real you need to nail.',
+    'Treat it like the real thing: stand up, commit, and go.',
+  ],
+  xp: 30,
+};
+
+export const getExercise = (id: string): Exercise | undefined => {
+  if (id === FREE_PLAY_ID) return FREE_PLAY;
+  return EXERCISES.find((e) => e.id === id);
+};
 
 /**
  * The next exercise the presenter should do: the first one they have not yet

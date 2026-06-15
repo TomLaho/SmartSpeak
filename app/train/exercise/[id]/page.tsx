@@ -8,7 +8,8 @@ import { analyzeAudioInWorker, type AudioMetrics } from '@/lib/audio-analysis';
 import { coachAttempt, type CoachResult } from '@/lib/coach';
 import { loadCalibration, toCalibrationInput } from '@/lib/calibration';
 import { transcribeOnDevice, isOnDeviceTranscriptionSupported, type TranscribeProgress } from '@/lib/transcribe';
-import { isProCached, refreshEntitlement, canAccessExercise } from '@/lib/entitlement';
+import { isProCached, refreshEntitlement, canAccessExercise, canAccessFreePlay } from '@/lib/entitlement';
+import { FREE_PLAY_ID } from '@/lib/exercises';
 import {
   loadProgress,
   recordAttempt,
@@ -110,11 +111,25 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
   useEffect(() => () => cleanup(), [cleanup]);
 
   // Gate deep links: free users get FREE_EXERCISE_LIMIT distinct exercises.
+  // Free-play has its own separate gate (1 free use; never burns a preview slot).
   useEffect(() => {
     if (!exercise) return;
     const progress = loadProgress();
+
+    if (exercise.id === FREE_PLAY_ID) {
+      const freePlayAttempts = progress.exercises[FREE_PLAY_ID]?.attempts ?? 0;
+      if (canAccessFreePlay({ pro: isProCached(), freePlayAttempts })) return;
+      refreshEntitlement().then((pro) => {
+        if (!canAccessFreePlay({ pro, freePlayAttempts })) router.replace('/train/unlock');
+      });
+      return;
+    }
+
     const alreadyAttempted = (progress.exercises[exercise.id]?.attempts ?? 0) > 0;
-    const distinctAttempted = Object.values(progress.exercises).filter((e) => e.attempts > 0).length;
+    // Exclude FREE_PLAY_ID so a free-play rep never burns a preview slot.
+    const distinctAttempted = Object.entries(progress.exercises).filter(
+      ([id, e]) => e.attempts > 0 && id !== FREE_PLAY_ID
+    ).length;
     if (canAccessExercise({ pro: isProCached(), alreadyAttempted, distinctAttempted })) return;
     // Cached state says locked — confirm with Play before redirecting to the paywall.
     refreshEntitlement().then((pro) => {

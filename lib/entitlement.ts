@@ -125,3 +125,11 @@ export function canAccessExercise(args: {
   if (args.pro || args.alreadyAttempted) return true;
   return args.distinctAttempted < FREE_EXERCISE_LIMIT;
 }
+
+/** Free uses of the Open Mic free-play exercise for non-Pro users. */
+export const FREE_PLAY_FREE_USES = 1;
+
+/** Whether the user can access Open Mic. Pro users: unlimited; free users: one use. */
+export function canAccessFreePlay(args: { pro: boolean; freePlayAttempts: number }): boolean {
+  return args.pro || args.freePlayAttempts < FREE_PLAY_FREE_USES;
+}
