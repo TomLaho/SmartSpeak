@@ -124,7 +124,7 @@ export const EXERCISES: Exercise[] = [
     targetSeconds: 60,
     focus: ['pace', 'pauses'],
     readingText:
-      'Thanks everyone for making the time. In the next ten minutes I want to walk you through what we found, what it means for the roadmap, and the one decision I need from this group today. I will keep it tight, leave room for questions, and flag clearly where I am confident and where we are still learning. Let us start with the headline, and then I will show you the evidence behind it.',
+      'Thanks everyone for making the time. In the next 10 minutes I want to walk you through what we found, what it means for the roadmap, and the one decision I need from this group today. I will keep it tight, leave room for questions, and flag clearly where I am confident and where we are still learning. Let us start with the headline, and then I will show you the evidence behind it.',
     instructions: [
       'Read the passage aloud as if you were opening a real meeting.',
       'Aim for roughly 130–160 words per minute — about this passage in ~30 seconds.',
@@ -146,7 +146,7 @@ export const EXERCISES: Exercise[] = [
     targetSeconds: 55,
     focus: ['pauses', 'pace'],
     readingText:
-      'Here is the number that matters. [pause] Revenue from the new segment grew forty percent quarter over quarter. [pause] That is not a blip — it is the trend we bet on a year ago. So here is what I am asking for. [pause] Move two engineers onto this team for the next quarter, and let us double down while the window is open.',
+      'Here is the number that matters. [pause] Revenue from the new segment grew 40 percent quarter over quarter. [pause] That is not a blip — it is the trend we bet on a year ago. So here is what I am asking for. [pause] Move 2 engineers onto this team for the next quarter, and let us double down while the window is open.',
     instructions: [
       'Read aloud and take a real, full second of silence everywhere it says [pause].',
       'Do not say the word "pause" — just stop, count one-one-thousand, and continue.',
@@ -193,7 +193,7 @@ export const EXERCISES: Exercise[] = [
     targetSeconds: 55,
     focus: ['intonation', 'energy', 'pace'],
     readingText:
-      'The results are in, and they are better than we expected. Sign-ups are up sixty percent. Support tickets are down by a third. And — this is the one I care about most — customers who tried the new flow were twice as likely to come back the next week. Three numbers, one story: the change is working, and it is working faster than we planned.',
+      'The results are in, and they are better than we expected. Sign-ups are up 60 percent. Support tickets are down by a third. And — this is the one I care about most — customers who tried the new flow were twice as likely to come back the next week. 3 numbers, 1 story: the change is working, and it is working faster than we planned.',
     instructions: [
       'Read this like you are genuinely pleased to share good results.',
       'Lift your pitch and slow down on each number — let "sixty percent", "a third", and "twice" stand out.',
@@ -787,7 +787,7 @@ export const MODULES: LearningModule[] = [
     emoji: '✂️',
     gradient: 'from-sky-500 to-cyan-600',
     accent: '#38BDF8',
-    exerciseIds: ['s1-bluf', 'i1-execsummary', 's5-onebigidea'],
+    exerciseIds: ['s1-bluf', 'i1-execsummary', 'd7-cold-open'],
   },
   {
     id: 'great-explainer',
@@ -817,7 +817,7 @@ export const MODULES: LearningModule[] = [
     emoji: '🤝',
     gradient: 'from-emerald-500 to-teal-600',
     accent: '#34D399',
-    exerciseIds: ['i2-ask', 'i4-plan', 'i5-buyin'],
+    exerciseIds: ['i2-ask', 'i4-plan', 's5-onebigidea'],
   },
   {
     id: 'grace-under-fire',
@@ -837,7 +837,7 @@ export const MODULES: LearningModule[] = [
     emoji: '🎯',
     gradient: 'from-indigo-500 to-blue-600',
     accent: '#818CF8',
-    exerciseIds: ['i6-stakeholder-map', 'i8-close', 'd7-cold-open'],
+    exerciseIds: ['i5-buyin', 'i6-stakeholder-map', 'i8-close'],
   },
 ];
 
