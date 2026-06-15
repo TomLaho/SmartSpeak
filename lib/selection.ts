@@ -16,7 +16,7 @@
  *   4. Fallback to EXERCISES[0].
  */
 
-import { EXERCISES, type Exercise } from './exercises';
+import { EXERCISES, exercisesByModule, type Exercise, type ModuleId } from './exercises';
 import type { Progress } from './local-store';
 
 // ─────────────────── Helpers ───────────────────
@@ -51,6 +51,41 @@ export function masteryGateMessage(progress: Progress, trackId: string): string 
   }
   if (needed === 0) return null;
   return `${needed} more clean rep${needed === 1 ? '' : 's'} to unlock the next level.`;
+}
+
+// ─────────────────── Module helpers ───────────────────
+
+/**
+ * Returns the exercise the user should do next within a given module:
+ *   1. First not-yet-attempted in module order.
+ *   2. First with bestScore < 70 in module order (needs improvement).
+ *   3. First in module order (replay for fully mastered modules).
+ */
+export function nextInModule(progress: Progress, moduleId: ModuleId): Exercise {
+  const exercises = exercisesByModule(moduleId);
+  const notAttempted = exercises.find((e) => !(progress.exercises[e.id]?.attempts > 0));
+  if (notAttempted) return notAttempted;
+  const needsWork = exercises.find((e) => (progress.exercises[e.id]?.bestScore ?? 0) < 70);
+  if (needsWork) return needsWork;
+  return exercises[0];
+}
+
+/**
+ * Returns mastery progress stats for a module.
+ * masteredCount = exercises with bestScore >= 70.
+ * pct = round(masteredCount / total * 100).
+ * started = any exercise in the module has been attempted.
+ */
+export function moduleProgress(
+  progress: Progress,
+  moduleId: ModuleId
+): { masteredCount: number; total: number; pct: number; started: boolean } {
+  const exercises = exercisesByModule(moduleId);
+  const total = exercises.length;
+  const masteredCount = exercises.filter((e) => isMastered(progress, e.id)).length;
+  const started = exercises.some((e) => (progress.exercises[e.id]?.attempts ?? 0) > 0);
+  const pct = total > 0 ? Math.round((masteredCount / total) * 100) : 0;
+  return { masteredCount, total, pct, started };
 }
 
 // ─────────────────── Core selector ───────────────────

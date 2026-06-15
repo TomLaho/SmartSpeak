@@ -1,14 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   EXERCISES,
-  TRACKS,
-  exercisesByTrack,
-  type Exercise,
-  type TrackId,
+  MODULES,
+  FREE_PLAY_ID,
+  FREE_PLAY,
+  type ModuleId,
 } from '@/lib/exercises';
 import {
   loadProgress,
@@ -21,11 +21,11 @@ import {
   isProCached,
   refreshEntitlement,
   canAccessExercise,
+  canAccessFreePlay,
   FREE_EXERCISE_LIMIT,
   PRO_PRICE,
 } from '@/lib/entitlement';
-import { recommendNext } from '@/lib/selection';
-import { masteryGateMessage, isMastered } from '@/lib/selection';
+import { recommendNext, moduleProgress } from '@/lib/selection';
 import { loadUnlockedAchievements, ACHIEVEMENTS } from '@/lib/achievements';
 import { Ring } from '@/components/train/ring';
 import { LevelBar } from '@/components/train/level-bar';
@@ -67,8 +67,9 @@ export default function TrainHome() {
   const goalPct = Math.min(100, (repsCompletedToday / Math.max(1, dailyGoalReps)) * 100);
 
   const attempted = (id: string) => (progress?.exercises[id]?.attempts ?? 0) > 0;
+  // Exclude FREE_PLAY_ID so a free-play rep never burns a preview slot.
   const distinctAttempted = progress
-    ? Object.values(progress.exercises).filter((e) => e.attempts > 0).length
+    ? Object.entries(progress.exercises).filter(([id, e]) => e.attempts > 0 && id !== FREE_PLAY_ID).length
     : 0;
   const allDone = progress ? EXERCISES.every((e) => attempted(e.id)) : false;
 
@@ -305,149 +306,76 @@ export default function TrainHome() {
         )}
       </div>
 
-      {/* Skill paths */}
-      <div className="space-y-9">
-        {(Object.keys(TRACKS) as TrackId[]).map((trackId) => (
-          <TrackPath
-            key={trackId}
-            trackId={trackId}
-            progress={progress}
-            pro={pro}
-            distinctAttempted={distinctAttempted}
-          />
-        ))}
+      {/* Learning Modules */}
+      <div className="mb-7">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-white/40">Learning Modules</h2>
+        <div className="space-y-3">
+          {MODULES.map((module) => {
+            const mp = progress ? moduleProgress(progress, module.id as ModuleId) : { pct: 0, started: false, masteredCount: 0, total: 0 };
+            const statusLabel = mp.pct === 100 ? 'Mastered' : mp.started ? 'In progress' : 'Start module';
+            return (
+              <Link
+                key={module.id}
+                href={`/train/module/${module.id}`}
+                className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.05] p-4 transition-colors hover:bg-white/[0.08] active:scale-[0.99]"
+              >
+                <div className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-xl', module.gradient)}>
+                  {module.emoji}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold leading-tight">{module.name}</p>
+                  <p className="mt-0.5 truncate text-xs text-white/50">{module.blurb}</p>
+                  <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${mp.pct}%`, backgroundColor: module.accent }}
+                    />
+                  </div>
+                  <p className="mt-1 text-[10px]" style={{ color: mp.pct === 100 ? '#FFC857' : mp.started ? module.accent : 'rgba(255,255,255,0.35)' }}>
+                    {statusLabel}
+                  </p>
+                </div>
+                <span className="shrink-0 text-white/30">›</span>
+              </Link>
+            );
+          })}
+        </div>
       </div>
+
+      {/* Free Play — Open Mic */}
+      {(() => {
+        const freePlayAttempts = progress?.exercises[FREE_PLAY_ID]?.attempts ?? 0;
+        const freePlayAccessible = canAccessFreePlay({ pro, freePlayAttempts });
+        const href = freePlayAccessible ? `/train/exercise/${FREE_PLAY_ID}` : '/train/unlock';
+        return (
+          <Link
+            href={href}
+            className="mb-8 flex items-center gap-4 rounded-2xl border border-white/15 bg-white/[0.04] p-4 transition-colors hover:bg-white/[0.08] active:scale-[0.99]"
+          >
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-xl">
+              {FREE_PLAY.emoji}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <p className="font-bold leading-tight">{FREE_PLAY.title}</p>
+                {freePlayAccessible && !pro && freePlayAttempts === 0 && (
+                  <span className="rounded-full bg-spotlight/20 px-2 py-0.5 text-[10px] font-bold text-spotlight">
+                    1 free
+                  </span>
+                )}
+                {!freePlayAccessible && (
+                  <span className="rounded-full bg-spotlight/20 px-2.5 py-1 text-[10px] font-bold text-spotlight">
+                    PRO
+                  </span>
+                )}
+              </div>
+              <p className="mt-0.5 truncate text-xs text-white/50">Free Play — rehearse your own material, no rules.</p>
+            </div>
+            <span className="shrink-0 text-white/30">›</span>
+          </Link>
+        );
+      })()}
     </div>
   );
 }
 
-function TrackPath({
-  trackId,
-  progress,
-  pro,
-  distinctAttempted,
-}: {
-  trackId: TrackId;
-  progress: Progress | null;
-  pro: boolean;
-  distinctAttempted: number;
-}) {
-  const track = TRACKS[trackId];
-  const exercises = useMemo(() => exercisesByTrack(trackId), [trackId]);
-  const gateMsg = progress ? masteryGateMessage(progress, trackId) : null;
-
-  return (
-    <section>
-      <div className="mb-1 flex items-center gap-3">
-        <div className={cn('flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br text-xl', track.gradient)}>
-          {track.emoji}
-        </div>
-        <div>
-          <h2 className="text-lg font-bold leading-tight">{track.name}</h2>
-          <p className="text-xs text-white/50">{track.tagline}</p>
-        </div>
-      </div>
-
-      {/* Mastery gate hint */}
-      {gateMsg && (
-        <p className="mb-3 mt-1 pl-14 text-xs text-white/35">{gateMsg}</p>
-      )}
-      {!gateMsg && <div className="mb-4" />}
-
-      <div className="relative space-y-2.5">
-        {exercises.map((exercise, i) => {
-          const prev = exercises[i - 1];
-          const prevDone = !prev || (progress?.exercises[prev.id]?.attempts ?? 0) > 0;
-          const isAttempted = (progress?.exercises[exercise.id]?.attempts ?? 0) > 0;
-          const mastered = progress ? isMastered(progress, exercise.id) : false;
-          let state: NodeState = progress ? (isAttempted ? 'done' : prevDone ? 'open' : 'locked') : 'open';
-          if (state === 'open' && !canAccessExercise({ pro, alreadyAttempted: isAttempted, distinctAttempted })) {
-            state = 'pro';
-          }
-          return (
-            <PathNode
-              key={exercise.id}
-              exercise={exercise}
-              accent={track.accent}
-              state={state}
-              best={progress?.exercises[exercise.id]?.bestScore}
-              mastered={mastered}
-            />
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-type NodeState = 'done' | 'open' | 'locked' | 'pro';
-
-function PathNode({
-  exercise,
-  accent,
-  state,
-  best,
-  mastered,
-}: {
-  exercise: Exercise;
-  accent: string;
-  state: NodeState;
-  best?: number;
-  mastered?: boolean;
-}) {
-  const locked = state === 'locked';
-  const isPro = state === 'pro';
-  const isDone = state === 'done';
-
-  const content = (
-    <div
-      className={cn(
-        'flex items-center gap-4 rounded-2xl border p-3.5 transition-colors',
-        locked
-          ? 'border-white/5 bg-white/[0.02] opacity-55'
-          : isPro
-          ? 'border-spotlight/20 bg-white/[0.05] hover:bg-white/[0.08] active:scale-[0.99]'
-          : 'border-white/10 bg-white/[0.05] hover:bg-white/[0.08] active:scale-[0.99]'
-      )}
-    >
-      <div
-        className={cn(
-          'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-xl',
-          isDone && mastered ? 'ring-2 ring-spotlight/60' : ''
-        )}
-        style={{ backgroundColor: isDone ? accent : 'rgba(255,255,255,0.06)' }}
-      >
-        {locked ? '🔒' : isDone && mastered ? '✦' : isDone ? '✓' : exercise.emoji}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className="truncate font-semibold">{exercise.title}</p>
-          <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/60">
-            Lv {exercise.level}
-          </span>
-        </div>
-        <div className="mt-1 flex items-center gap-1.5">
-          <span className="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/50">{exercise.scenario}</span>
-          <p className="truncate text-xs text-white/45">{exercise.summary}</p>
-        </div>
-      </div>
-      {isDone && typeof best === 'number' && (
-        <div className="shrink-0 text-right">
-          <p className="text-sm font-bold" style={{ color: mastered ? '#FFC857' : accent }}>
-            {best}
-          </p>
-          <p className="text-[10px] text-white/40">best</p>
-        </div>
-      )}
-      {state === 'open' && <span className="shrink-0 text-white/30">›</span>}
-      {isPro && (
-        <span className="shrink-0 rounded-full bg-spotlight/20 px-2.5 py-1 text-[10px] font-bold text-spotlight">
-          PRO
-        </span>
-      )}
-    </div>
-  );
-
-  if (locked) return content;
-  return <Link href={isPro ? '/train/unlock' : `/train/exercise/${exercise.id}`}>{content}</Link>;
-}
