@@ -26,12 +26,10 @@ import {
   PRO_PRICE,
 } from '@/lib/entitlement';
 import { recommendNext, moduleProgress } from '@/lib/selection';
-import { loadUnlockedAchievements, ACHIEVEMENTS } from '@/lib/achievements';
 import { Ring } from '@/components/train/ring';
 import { LevelBar } from '@/components/train/level-bar';
 import { LogoMark } from '@/components/brand/logo';
 import { cn } from '@/lib/utils';
-import type { Achievement } from '@/lib/achievements';
 
 const ONBOARDING_KEY = 'smartspeak.onboarded.v1';
 
@@ -41,7 +39,6 @@ export default function TrainHome() {
   const [showCalNudge, setShowCalNudge] = useState(false);
   const [pro, setPro] = useState(false);
   const [dailyGoalReps, setDailyGoalReps] = useState(1);
-  const [unlockedAchievements, setUnlockedAchievements] = useState<Achievement[]>([]);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
@@ -51,7 +48,6 @@ export default function TrainHome() {
     setPro(isProCached());
     refreshEntitlement().then(setPro);
     setDailyGoalReps(loadDailyGoalReps());
-    setUnlockedAchievements(loadUnlockedAchievements());
 
     // First-run onboarding: show if flag not set AND no history
     const onboarded = typeof window !== 'undefined'
@@ -86,8 +82,6 @@ export default function TrainHome() {
     alreadyAttempted: attempted(upNext.id),
     distinctAttempted,
   });
-
-  const lockedCount = ACHIEVEMENTS.length - unlockedAchievements.length;
 
   function dismissOnboarding() {
     if (typeof window !== 'undefined') {
@@ -265,46 +259,6 @@ export default function TrainHome() {
           </span>
         </Link>
       )}
-
-      {/* Achievements shelf */}
-      <div className="mb-7">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-white/40">Achievements</h2>
-          <Link href="/train/progress" className="text-xs text-spotlight/70 hover:text-spotlight">
-            See all
-          </Link>
-        </div>
-        {unlockedAchievements.length === 0 ? (
-          <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-            <span className="text-xl">🏅</span>
-            <p className="text-sm text-white/50">
-              Complete your first rep to earn your first badge.
-            </p>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            {unlockedAchievements.map((a) => (
-              <div
-                key={a.id}
-                title={`${a.name}: ${a.description}`}
-                className="flex shrink-0 flex-col items-center gap-1 rounded-2xl border border-spotlight/30 bg-spotlight/10 px-3 py-2.5"
-              >
-                <span className="text-xl">{a.emoji}</span>
-                <span className="text-[10px] font-medium text-spotlight/80 whitespace-nowrap">{a.name}</span>
-              </div>
-            ))}
-            {lockedCount > 0 && (
-              <Link
-                href="/train/progress"
-                className="flex shrink-0 flex-col items-center gap-1 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5"
-              >
-                <span className="text-xl">🔒</span>
-                <span className="text-[10px] text-white/35 whitespace-nowrap">{lockedCount} more</span>
-              </Link>
-            )}
-          </div>
-        )}
-      </div>
 
       {/* Learning Modules */}
       <div className="mb-7">

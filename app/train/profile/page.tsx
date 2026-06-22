@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { loadProgress, resetProgress, loadDailyGoalReps, saveDailyGoalReps, type Progress } from '@/lib/local-store';
+import { loadProgress, resetProgress, loadDailyGoalReps, saveDailyGoalReps, levelFor, type Progress } from '@/lib/local-store';
 import { isProCached, refreshEntitlement, PRO_PRICE } from '@/lib/entitlement';
 import { Button } from '@/components/ui/button';
 import { MicCalibration } from '@/components/train/mic-calibration';
@@ -28,18 +28,25 @@ export default function ProfilePage() {
     setDailyGoalReps(n);
   }
 
+  const level = levelFor(progress?.xp ?? 0);
+
   return (
     <div className="px-5 pb-8 pt-6">
       <h1 className="mb-5 text-2xl font-bold">Profile</h1>
 
-      {/* Identity card */}
+      {/* Identity card — avatar + title evolve with the user's level */}
       <div className="mb-6 flex items-center gap-4 rounded-3xl border border-white/10 bg-white/[0.05] p-5">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-spotlight/40 to-spotlight/10 text-2xl">
-          🗣️
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-spotlight/30 bg-gradient-to-br from-spotlight/30 to-spotlight/5 text-3xl">
+          {level.avatar}
         </div>
-        <div>
-          <p className="font-semibold">Presenter</p>
-          <p className="text-sm text-white/55">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="truncate text-lg font-bold text-white">{level.title}</p>
+            <span className="shrink-0 rounded-full bg-spotlight/15 px-2 py-0.5 text-xs font-semibold text-spotlight">
+              Lv {level.level}
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-white/70">
             {(progress?.xp ?? 0).toLocaleString()} XP · 🔥 {progress?.streak ?? 0} day streak
           </p>
         </div>

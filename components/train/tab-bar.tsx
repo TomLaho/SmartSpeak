@@ -21,7 +21,10 @@ export function TabBar() {
   // Hide the chrome during a lesson and the paywall for a focused, full-screen view.
   if (pathname.includes('/train/exercise/') || pathname === '/train/unlock') return null;
   return (
-    <nav className="sticky bottom-0 z-20 border-t border-white/10 bg-ink/80 backdrop-blur">
+    <>
+      {/* In-flow spacer reserves room so content never hides behind the fixed bar. */}
+      <div className="h-[calc(3.5rem+env(safe-area-inset-bottom))]" aria-hidden />
+      <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-md border-t border-white/10 bg-ink/90 backdrop-blur">
       <div className="mx-auto flex max-w-md items-stretch justify-around px-2 py-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))]">
         {tabs.map((tab) => {
           const active = tab.href === '/train' ? pathname === '/train' : pathname.startsWith(tab.href);
@@ -42,6 +45,7 @@ export function TabBar() {
           );
         })}
       </div>
-    </nav>
+      </nav>
+    </>
   );
 }
