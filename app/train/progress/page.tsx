@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { EXERCISES, DIMENSION_LABELS, BENCHMARKS, getExercise, type Dimension } from '@/lib/exercises';
+import { DIMENSION_LABELS, BENCHMARKS, getExercise, type Dimension } from '@/lib/exercises';
 import {
   loadProgress,
   dimensionTrend,
@@ -60,7 +60,7 @@ export default function ProgressPage() {
       <div className="mb-6 grid grid-cols-3 gap-3">
         <Tile value={(progress?.streak ?? 0).toString()} label="Day streak" emoji="🔥" />
         <Tile value={(progress?.xp ?? 0).toLocaleString()} label="Total XP" emoji="⚡" />
-        <Tile value={`${completed}/${EXERCISES.length}`} label="Exercises" emoji="✅" />
+        <Tile value={completed.toString()} label="Exercises done" emoji="✅" />
       </div>
 
       {/* Recent average score ring */}

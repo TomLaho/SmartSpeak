@@ -131,13 +131,13 @@ export default function ProfilePage() {
 
       {/* Navigation links */}
       <div className="space-y-3">
-        <Button asChild variant="secondary" className="h-12 w-full justify-between rounded-2xl bg-white/10 hover:bg-white/20">
+        <Button asChild variant="secondary" className="h-12 w-full justify-between rounded-2xl bg-white/10 text-white hover:bg-white/20">
           <Link href="/train">
             <span>🎯 Today&apos;s session</span>
             <span className="text-white/40">›</span>
           </Link>
         </Button>
-        <Button asChild variant="secondary" className="h-12 w-full justify-between rounded-2xl bg-white/10 hover:bg-white/20">
+        <Button asChild variant="secondary" className="h-12 w-full justify-between rounded-2xl bg-white/10 text-white hover:bg-white/20">
           <Link href="/">
             <span>ℹ️ About SmartSpeak</span>
             <span className="text-white/40">›</span>

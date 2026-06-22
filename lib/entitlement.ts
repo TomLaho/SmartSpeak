@@ -126,6 +126,19 @@ export function canAccessExercise(args: {
   return args.distinctAttempted < FREE_EXERCISE_LIMIT;
 }
 
+/**
+ * Number of learning modules unlocked for free (by 1-based `order`). The rest
+ * are shown locked — a visible curiosity gap that points at the Pro unlock.
+ * Module 1 holds exactly FREE_EXERCISE_LIMIT exercises, so the free curriculum
+ * and the free-rep allowance line up cleanly.
+ */
+export const FREE_MODULE_LIMIT = 1;
+
+/** Whether a learning module is unlocked for this user. */
+export function isModuleUnlocked(args: { pro: boolean; order: number }): boolean {
+  return args.pro || args.order <= FREE_MODULE_LIMIT;
+}
+
 /** Free uses of the Open Mic free-play exercise for non-Pro users. */
 export const FREE_PLAY_FREE_USES = 1;
 
