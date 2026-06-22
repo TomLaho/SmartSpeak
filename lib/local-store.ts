@@ -259,12 +259,28 @@ const TITLES = [
   'Keynote',         // level 11+
 ] as const;
 
+// One avatar per title — the user's avatar evolves as they level up.
+const TITLE_AVATARS: Record<(typeof TITLES)[number], string> = {
+  Rookie: '🐣',
+  Speaker: '🎤',
+  Presenter: '📊',
+  Closer: '🤝',
+  Influencer: '🌟',
+  Strategist: '♟️',
+  'Boardroom-ready': '💼',
+  Keynote: '👑',
+};
+
+function avatarFor(title: (typeof TITLES)[number]): string {
+  return TITLE_AVATARS[title];
+}
+
 function xpForLevel(level: number): number {
   // Cumulative XP required to REACH `level` (level 1 starts at 0).
   return level <= 1 ? 0 : 75 * (level - 1) * (level - 1);
 }
 
-function titleFor(level: number): string {
+function titleFor(level: number): (typeof TITLES)[number] {
   const idx = Math.min(TITLES.length - 1, Math.floor((level - 1) / 1.5));
   return TITLES[Math.max(0, idx)];
 }
@@ -272,6 +288,7 @@ function titleFor(level: number): string {
 export function levelFor(xp: number): {
   level: number;
   title: string;
+  avatar: string;
   xpIntoLevel: number;
   xpForNext: number;
 } {
@@ -281,7 +298,8 @@ export function levelFor(xp: number): {
   while (level < 1000 && xpForLevel(level + 1) <= safeXp) level++;
   const xpIntoLevel = safeXp - xpForLevel(level);
   const xpForNext = xpForLevel(level + 1) - xpForLevel(level);
-  return { level, title: titleFor(level), xpIntoLevel, xpForNext };
+  const title = titleFor(level);
+  return { level, title, avatar: avatarFor(title), xpIntoLevel, xpForNext };
 }
 
 // ─────────────────── Daily goal (reps-based) ─────────────────
