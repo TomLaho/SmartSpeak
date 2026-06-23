@@ -22,6 +22,7 @@ import {
   refreshEntitlement,
   canAccessExercise,
   canAccessFreePlay,
+  isModuleUnlocked,
   FREE_EXERCISE_LIMIT,
   PRO_PRICE,
 } from '@/lib/entitlement';
@@ -71,7 +72,7 @@ export default function TrainHome() {
 
   // Use recommendNext when we have progress history, fall back gracefully
   const recommended = progress && progress.history.length > 0
-    ? recommendNext(progress)
+    ? recommendNext(progress, pro)
     : null;
   const upNext = recommended?.exercise ?? EXERCISES.find((e) => !attempted(e.id)) ?? EXERCISES[0];
   const upNextReason = recommended?.reason ?? null;
@@ -265,6 +266,32 @@ export default function TrainHome() {
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-white/40">Learning Modules</h2>
         <div className="space-y-3">
           {MODULES.map((module) => {
+            const unlocked = isModuleUnlocked({ pro, order: module.order });
+            if (!unlocked) {
+              // Locked module — visible curiosity gap pointing at the Pro unlock.
+              return (
+                <Link
+                  key={module.id}
+                  href="/train/unlock"
+                  className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4 transition-colors hover:bg-white/[0.07] active:scale-[0.99]"
+                >
+                  <div className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-xl opacity-50', module.gradient)}>
+                    {module.emoji}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate font-bold leading-tight text-white/80">{module.name}</p>
+                      <span className="shrink-0 rounded-full bg-spotlight/15 px-2 py-0.5 text-[10px] font-bold text-spotlight">
+                        🔒 PRO
+                      </span>
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-white/45">{module.blurb}</p>
+                    <p className="mt-1 text-[10px] font-semibold text-spotlight/80">Unlock · {PRO_PRICE}</p>
+                  </div>
+                  <span className="shrink-0 text-white/30">›</span>
+                </Link>
+              );
+            }
             const mp = progress ? moduleProgress(progress, module.id as ModuleId) : { pct: 0, started: false, masteredCount: 0, total: 0 };
             const statusLabel = mp.pct === 100 ? 'Mastered' : mp.started ? 'In progress' : 'Start module';
             return (

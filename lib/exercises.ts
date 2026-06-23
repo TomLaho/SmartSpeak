@@ -844,6 +844,10 @@ export const MODULES: LearningModule[] = [
 export const getModule = (id: string): LearningModule | undefined =>
   MODULES.find((m) => m.id === id);
 
+/** The learning module an exercise belongs to (undefined if unmapped, e.g. free-play). */
+export const moduleForExercise = (exerciseId: string): LearningModule | undefined =>
+  MODULES.find((m) => m.exerciseIds.includes(exerciseId));
+
 export const exercisesByModule = (id: ModuleId): Exercise[] => {
   const mod = MODULES.find((m) => m.id === id);
   if (!mod) return [];

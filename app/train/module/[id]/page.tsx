@@ -14,6 +14,8 @@ import {
   isProCached,
   refreshEntitlement,
   canAccessExercise,
+  isModuleUnlocked,
+  PRO_PRICE,
 } from '@/lib/entitlement';
 import { nextInModule, moduleProgress, isMastered } from '@/lib/selection';
 import { cn } from '@/lib/utils';
@@ -77,9 +79,11 @@ export default function ModulePage({ params }: { params: { id: string } }) {
     distinctAttempted,
   });
 
-  const ctaHref = nextAccessible
-    ? `/train/exercise/${next.id}`
-    : '/train/unlock';
+  const locked = !isModuleUnlocked({ pro, order: learningModule.order });
+
+  const ctaHref = locked || !nextAccessible
+    ? '/train/unlock'
+    : `/train/exercise/${next.id}`;
 
   return (
     <div className="flex min-h-[100dvh] flex-col px-5 pb-8 pt-5">
@@ -169,7 +173,7 @@ export default function ModulePage({ params }: { params: { id: string } }) {
         )}
       </div>
 
-      {/* Next up — mysterious card */}
+      {/* Next up — mysterious card (locked modules tease the unlock) */}
       <div className="mb-8">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-white/40">
           Next up
@@ -179,11 +183,13 @@ export default function ModulePage({ params }: { params: { id: string } }) {
           className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.05] p-4 transition-colors hover:bg-white/[0.08] active:scale-[0.99]"
         >
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-xl text-white/30">
-            ?
+            {locked ? '🔒' : '?'}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="font-semibold">Next up</p>
-            <p className="text-xs text-white/45">Keep going to reveal it.</p>
+            <p className="font-semibold">{locked ? 'Locked' : 'Next up'}</p>
+            <p className="text-xs text-white/45">
+              {locked ? `Unlock every module with Pro · ${PRO_PRICE}.` : 'Keep going to reveal it.'}
+            </p>
           </div>
           <span className="shrink-0 text-white/30">›</span>
         </Link>
@@ -195,7 +201,7 @@ export default function ModulePage({ params }: { params: { id: string } }) {
         size="lg"
         className="h-14 w-full rounded-2xl bg-spotlight text-base text-ink hover:bg-spotlight-soft"
       >
-        {mp.started ? 'Continue module' : 'Start module'}
+        {locked ? `Unlock · ${PRO_PRICE}` : mp.started ? 'Continue module' : 'Start module'}
       </Button>
     </div>
   );

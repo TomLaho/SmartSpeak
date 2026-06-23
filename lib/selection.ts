@@ -16,7 +16,8 @@
  *   4. Fallback to EXERCISES[0].
  */
 
-import { EXERCISES, exercisesByModule, type Exercise, type ModuleId } from './exercises';
+import { EXERCISES, exercisesByModule, moduleForExercise, type Exercise, type ModuleId } from './exercises';
+import { isModuleUnlocked } from './entitlement';
 import type { Progress } from './local-store';
 
 // ─────────────────── Helpers ───────────────────
@@ -103,12 +104,26 @@ function todayKey(): string {
  * Recommend the next exercise for the presenter to work on.
  *
  * Returns the exercise and a short human-readable reason to show in the UI.
+ *
+ * `pro` gates the candidate pool: for free users we never recommend an exercise
+ * that lives in a locked module, so the suggestion always lands somewhere they
+ * can actually start.
  */
-export function recommendNext(progress: Progress): { exercise: Exercise; reason: string } {
+export function recommendNext(
+  progress: Progress,
+  pro: boolean
+): { exercise: Exercise; reason: string } {
   const today = todayKey();
 
+  // Only ever recommend exercises the user can actually open. Unmapped
+  // exercises (none today) are treated as accessible so nothing silently hides.
+  const pool = EXERCISES.filter((ex) => {
+    const mod = moduleForExercise(ex.id);
+    return !mod || isModuleUnlocked({ pro, order: mod.order });
+  });
+
   // ── Priority 1: Weakest attempted exercise, >=1 day old, score < 60 ──
-  for (const ex of EXERCISES) {
+  for (const ex of pool) {
     const ep = progress.exercises[ex.id];
     if (!ep) continue;
     if (ep.lastScore >= 60) continue;
@@ -122,7 +137,7 @@ export function recommendNext(progress: Progress): { exercise: Exercise; reason:
   }
 
   // ── Priority 2: First not-yet-attempted exercise in path order ──
-  const notAttempted = EXERCISES.find((ex) => !progress.exercises[ex.id]);
+  const notAttempted = pool.find((ex) => !progress.exercises[ex.id]);
   if (notAttempted) {
     return {
       exercise: notAttempted,
@@ -131,7 +146,7 @@ export function recommendNext(progress: Progress): { exercise: Exercise; reason:
   }
 
   // ── Priority 3: Oldest-last-practiced among exercises with bestScore < 85 ──
-  const candidates = EXERCISES.filter((ex) => {
+  const candidates = pool.filter((ex) => {
     const ep = progress.exercises[ex.id];
     return ep && ep.bestScore < 85;
   });
@@ -150,7 +165,7 @@ export function recommendNext(progress: Progress): { exercise: Exercise; reason:
 
   // ── Fallback ──
   return {
-    exercise: EXERCISES[0],
+    exercise: pool[0] ?? EXERCISES[0],
     reason: 'Keep the habit going.',
   };
 }
