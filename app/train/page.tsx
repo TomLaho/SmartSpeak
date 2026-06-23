@@ -72,7 +72,7 @@ export default function TrainHome() {
 
   // Use recommendNext when we have progress history, fall back gracefully
   const recommended = progress && progress.history.length > 0
-    ? recommendNext(progress)
+    ? recommendNext(progress, pro)
     : null;
   const upNext = recommended?.exercise ?? EXERCISES.find((e) => !attempted(e.id)) ?? EXERCISES[0];
   const upNextReason = recommended?.reason ?? null;
