@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   description: 'The terms for using SmartSpeak.',
 };
 
-const CONTACT_EMAIL = 'support@smartspeak.app'; // ← replace with your real support email
+const CONTACT_EMAIL = 'lahoguetom@gmail.com';
 const UPDATED = 'June 2026';
 
 export default function TermsPage() {
