@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 // NOTE: Review with the contact details below before publishing to the Play Store.
-const CONTACT_EMAIL = 'support@smartspeak.app'; // ← replace with your real support email
+const CONTACT_EMAIL = 'lahoguetom@gmail.com';
 const UPDATED = 'June 2026';
 
 export default function PrivacyPage() {
