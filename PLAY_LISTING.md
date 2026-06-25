@@ -24,7 +24,7 @@ Production domain: **`smartspeak-kappa.vercel.app`**.
 | Task | Answer | Notes |
 |---|---|---|
 | **Set privacy policy** | `https://smartspeak-kappa.vercel.app/privacy` | — |
-| **Sign-in / App access** | *All functionality available without special access* | No login exists. The Pro in-app purchase is **not** a login gate, so reviewers need no credentials. |
+| **Sign-in / App access** | **Yes** (part of the app is restricted) → Add details: Name `Pro content — one-time in-app purchase`; leave username/password **blank**; in "other information" state there is no login and the only restriction is the `pro_unlock` Google Play IAP. | The form buckets "payments / one-time products / access tiers" under Yes, and the No option requires "no content requires payment" — false for us. So Yes is the accurate answer. No login exists, hence blank credentials. |
 | **Ads** | **No**, app contains no ads | True — no ad SDKs. |
 | **Content rating** | Start questionnaire → category **Utility / Productivity / Education**. Answer **No** to violence, sexual content, profanity, drugs, gambling, location sharing, user-to-user communication. | Result will be *Everyone / PEGI 3*. |
 | **Target audience** | Target age group: **18 and over** only. "Designed for children?" → **No**. | Keeps you out of the Families program and its extra obligations — correct for a work tool. |

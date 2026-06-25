@@ -1,0 +1,8 @@
+# Security headers for static hosting on Cloudflare Pages & Netlify.
+# (Next.js `output: 'export'` can't emit headers, so they live here.)
+# Vercel ignores this file — see vercel.json for the same headers there.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: microphone=(self)
