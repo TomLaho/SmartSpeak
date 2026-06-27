@@ -3,15 +3,15 @@
 Ready-to-paste answers and copy for every Play Console task. Package name is
 **`app.smartspeak.twa`** everywhere. Contact email is **lahoguetom@gmail.com**.
 
-Production domain: **`smartspeak-kappa.vercel.app`**.
+Production domain: **`smartspeak-app.netlify.app`**.
 
 ---
 
 ## A. The two URLs Console keeps asking for
 | Field | Value |
 |---|---|
-| Privacy policy URL | `https://smartspeak-kappa.vercel.app/privacy` |
-| (Terms, if asked) | `https://smartspeak-kappa.vercel.app/terms` |
+| Privacy policy URL | `https://smartspeak-app.netlify.app/privacy` |
+| (Terms, if asked) | `https://smartspeak-app.netlify.app/terms` |
 
 > These pages already exist in the app and now show your Gmail. They go live the
 > moment you push to the branch Vercel deploys to production — do that **before**
@@ -23,7 +23,7 @@ Production domain: **`smartspeak-kappa.vercel.app`**.
 
 | Task | Answer | Notes |
 |---|---|---|
-| **Set privacy policy** | `https://smartspeak-kappa.vercel.app/privacy` | — |
+| **Set privacy policy** | `https://smartspeak-app.netlify.app/privacy` | — |
 | **Sign-in / App access** | **Yes** (part of the app is restricted) → Add details: Name `Pro content — one-time in-app purchase`; leave username/password **blank**; in "other information" state there is no login and the only restriction is the `pro_unlock` Google Play IAP. | The form buckets "payments / one-time products / access tiers" under Yes, and the No option requires "no content requires payment" — false for us. So Yes is the accurate answer. No login exists, hence blank credentials. |
 | **Ads** | **No**, app contains no ads | True — no ad SDKs. |
 | **Content rating** | Start questionnaire → category **Utility / Productivity / Education**. Answer **No** to violence, sexual content, profanity, drugs, gambling, location sharing, user-to-user communication. | Result will be *Everyone / PEGI 3*. |
@@ -106,10 +106,10 @@ mid-take, and a results screen with the score rings.
 ---
 
 ## F. Critical-path sequence from here
-1. **Push current code to production** (privacy email + `assetlinks.json`) so Vercel redeploys. Verify `https://smartspeak-kappa.vercel.app/privacy` loads and shows your Gmail.
+1. **Push current code to production** (privacy email + `assetlinks.json`) so Vercel redeploys. Verify `https://smartspeak-app.netlify.app/privacy` loads and shows your Gmail.
 2. In Play Console → **Test and release → App integrity → App signing** → copy the **SHA-256 certificate fingerprint**.
-3. Paste it into `public/.well-known/assetlinks.json` (replace `REPLACE_WITH_PLAY_APP_SIGNING_SHA256`), push again, then confirm `https://smartspeak-kappa.vercel.app/.well-known/assetlinks.json` returns the JSON.
-4. **Package the TWA** (PWABuilder or Bubblewrap) against `https://smartspeak-kappa.vercel.app`:
+3. Paste it into `public/.well-known/assetlinks.json` (replace `REPLACE_WITH_PLAY_APP_SIGNING_SHA256`), push again, then confirm `https://smartspeak-app.netlify.app/.well-known/assetlinks.json` returns the JSON.
+4. **Package the TWA** (PWABuilder or Bubblewrap) against `https://smartspeak-app.netlify.app`:
    - applicationId / package id = **`app.smartspeak.twa`** (must match exactly)
    - enable **Google Play Billing** and tick **Microphone (RECORD_AUDIO)**
    - upload the signed `.aab`.
