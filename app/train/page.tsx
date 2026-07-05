@@ -41,6 +41,7 @@ export default function TrainHome() {
   const [pro, setPro] = useState(false);
   const [dailyGoalReps, setDailyGoalReps] = useState(1);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [evening, setEvening] = useState(false);
 
   useEffect(() => {
     const p = loadProgress();
@@ -49,6 +50,7 @@ export default function TrainHome() {
     setPro(isProCached());
     refreshEntitlement().then(setPro);
     setDailyGoalReps(loadDailyGoalReps());
+    setEvening(new Date().getHours() >= 17);
 
     // First-run onboarding: show if flag not set AND no history
     let onboarded: string | null = '1';
@@ -180,6 +182,19 @@ export default function TrainHome() {
         </div>
       </div>
 
+      {/* Streak-at-risk nudge: evening, active streak, nothing practised yet today */}
+      {evening && (progress?.streak ?? 0) >= 2 && repsCompletedToday === 0 && (
+        <Link
+          href={upNextAccessible ? `/train/exercise/${upNext.id}` : '/train/unlock'}
+          className="mb-5 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3.5"
+        >
+          <span className="text-lg">🔥</span>
+          <p className="flex-1 text-sm text-white/70">
+            Your {progress?.streak ?? 0}-day streak is on the line — one 1-minute rep keeps it alive.
+          </p>
+        </Link>
+      )}
+
       {/* Mic calibration nudge (dismissible, one-time) */}
       {showCalNudge && (
         <div className="mb-5 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
@@ -296,7 +311,9 @@ export default function TrainHome() {
                       </span>
                     </div>
                     <p className="mt-0.5 truncate text-xs text-white/45">{module.blurb}</p>
-                    <p className="mt-1 text-[10px] font-semibold text-spotlight/80">Unlock · {PRO_PRICE}</p>
+                    <p className="mt-1 text-[10px] font-semibold text-spotlight/80">
+                      {distinctAttempted === 0 ? 'Included in Pro' : `Unlock · ${PRO_PRICE}`}
+                    </p>
                   </div>
                   <span className="shrink-0 text-white/30">›</span>
                 </Link>

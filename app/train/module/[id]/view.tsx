@@ -188,7 +188,11 @@ export default function ModulePage({ params }: { params: { id: string } }) {
           <div className="min-w-0 flex-1">
             <p className="font-semibold">{locked ? 'Locked' : 'Next up'}</p>
             <p className="text-xs text-white/45">
-              {locked ? `Unlock every module with Pro · ${PRO_PRICE}.` : 'Keep going to reveal it.'}
+              {locked
+                ? distinctAttempted === 0
+                  ? 'Included in SmartSpeak Pro.'
+                  : `Unlock every module with Pro · ${PRO_PRICE}.`
+                : 'Keep going to reveal it.'}
             </p>
           </div>
           <span className="shrink-0 text-white/30">›</span>
@@ -201,7 +205,13 @@ export default function ModulePage({ params }: { params: { id: string } }) {
         size="lg"
         className="h-14 w-full rounded-2xl bg-spotlight text-base text-ink hover:bg-spotlight-soft"
       >
-        {locked ? `Unlock · ${PRO_PRICE}` : mp.started ? 'Continue module' : 'Start module'}
+        {locked
+          ? distinctAttempted === 0
+            ? "See what's in Pro"
+            : `Unlock · ${PRO_PRICE}`
+          : mp.started
+          ? 'Continue module'
+          : 'Start module'}
       </Button>
     </div>
   );
