@@ -51,19 +51,27 @@ Production domain: **`smartspeak-app.netlify.app`**.
 
 ## D. Store listing copy (paste-ready)
 
-**App name** (30 max): `SmartSpeak`
+**App name** (30 max): `SmartSpeak: Presentation Coach`
+
+> Exactly 30 chars. The title is Play's strongest keyword field — "presentation
+> coach" now ranks from the name itself. (Fallback if you prefer the bare brand:
+> `SmartSpeak`.)
 
 **Short description** (80 max):
 ```
-Your pocket presentation coach — 1-minute daily reps to nail work presentations.
+Public speaking practice for work — 1-minute daily reps with a private coach.
 ```
+
+> 77 chars. Leads with the category's head search phrase ("public speaking
+> practice"), which the previous copy never mentioned.
 
 **Full description** (4000 max):
 ```
-SmartSpeak is your pocket presentation coach for work. In about a minute a day,
-you rehearse the moments that actually move your career — reading out findings,
-walking a deck, pitching a strategy, defending a plan, giving a status update,
-and handling tough questions under pressure.
+SmartSpeak is your pocket presentation coach — public speaking practice built
+for work. In about a minute a day, you rehearse the moments that actually move
+your career: reading out findings, walking a deck, pitching a strategy,
+defending a plan, giving a status update, and handling tough questions under
+pressure.
 
 Record a short take and get instant, private feedback on:
 
@@ -75,8 +83,9 @@ Record a short take and get instant, private feedback on:
 • Influence & Q&A — the 60-second executive summary, a confident ask, and staying
   answer-first when your plan gets challenged.
 
-It's built as a daily habit: short, work-scenario exercises with streaks, XP and a
-daily goal, organised into focused modules so you always know your next rep.
+Built as a daily habit — like a gym for your communication skills: short,
+work-scenario speech exercises with streaks, XP and a daily goal, organised into
+focused modules so you always know your next rep.
 
 Private by design. Everything runs on your device — recording, analysis and
 transcription. Your voice never leaves your phone, there are no accounts, and
@@ -85,6 +94,10 @@ nothing is uploaded to a server. It even works offline after the first use.
 Free preview: the first three exercises are free. A single one-time Pro purchase
 unlocks the full curriculum — no subscription, tied to your Google account so it
 restores on any device.
+
+Whether you're preparing a board presentation, a project pitch or a findings
+readout — or you simply want more presence in meetings — one focused rep a day
+compounds into real presentation skills.
 ```
 
 > Per Google's "deliver exactly what's promised" rule: every claim above is true
@@ -106,7 +119,7 @@ mid-take, and a results screen with the score rings.
 ---
 
 ## F. Critical-path sequence from here
-1. **Push current code to production** (privacy email + `assetlinks.json`) so Vercel redeploys. Verify `https://smartspeak-app.netlify.app/privacy` loads and shows your Gmail.
+1. **Push current code to production** (privacy email + `assetlinks.json`) so Netlify redeploys. Verify `https://smartspeak-app.netlify.app/privacy` loads and shows your Gmail.
 2. In Play Console → **Test and release → App integrity → App signing** → copy the **SHA-256 certificate fingerprint**.
 3. Paste it into `public/.well-known/assetlinks.json` (replace `REPLACE_WITH_PLAY_APP_SIGNING_SHA256`), push again, then confirm `https://smartspeak-app.netlify.app/.well-known/assetlinks.json` returns the JSON.
 4. **Package the TWA** (PWABuilder or Bubblewrap) against `https://smartspeak-app.netlify.app`:
