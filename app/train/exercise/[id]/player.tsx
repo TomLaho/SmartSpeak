@@ -7,7 +7,12 @@ import { EXERCISES, getExercise, pickVariation, BENCHMARKS } from '@/lib/exercis
 import { analyzeAudioInWorker, type AudioMetrics } from '@/lib/audio-analysis';
 import { coachAttempt, type CoachResult } from '@/lib/coach';
 import { loadCalibration, toCalibrationInput } from '@/lib/calibration';
-import { transcribeOnDevice, isOnDeviceTranscriptionSupported, type TranscribeProgress } from '@/lib/transcribe';
+import {
+  transcribeOnDevice,
+  isOnDeviceTranscriptionSupported,
+  warmUpTranscriber,
+  type TranscribeProgress,
+} from '@/lib/transcribe';
 import {
   isProCached,
   refreshEntitlement,
@@ -131,9 +136,10 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
 
     if (exercise.id === FREE_PLAY_ID) {
       const freePlayAttempts = progress.exercises[FREE_PLAY_ID]?.attempts ?? 0;
-      if (canAccessFreePlay({ pro: isProCached(), freePlayAttempts })) return;
+      const lastFreePlayDate = progress.exercises[FREE_PLAY_ID]?.lastDate ?? null;
+      if (canAccessFreePlay({ pro: isProCached(), freePlayAttempts, lastFreePlayDate })) return;
       refreshEntitlement().then((pro) => {
-        if (!canAccessFreePlay({ pro, freePlayAttempts })) router.replace('/train/unlock');
+        if (!canAccessFreePlay({ pro, freePlayAttempts, lastFreePlayDate })) router.replace('/train/unlock');
       });
       return;
     }
@@ -187,91 +193,99 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
         setTranscriptionDiag(null);
       }
 
-      const calibration = toCalibrationInput(loadCalibration());
-      const audio = await analyzeAudioInWorker(blob, wordCount, calibration);
-      setMetrics(audio);
+      try {
+        const calibration = toCalibrationInput(loadCalibration());
+        const audio = await analyzeAudioInWorker(blob, wordCount, calibration);
+        setMetrics(audio);
 
-      // Read previous dimension scores before this attempt so coach can show deltas.
-      const progressBeforeAttempt = loadProgress();
-      const previous = lastDimensionScores(progressBeforeAttempt);
-      const bestScoreBefore = progressBeforeAttempt.exercises[exercise.id]?.bestScore ?? 0;
+        // Read previous dimension scores before this attempt so coach can show deltas.
+        const progressBeforeAttempt = loadProgress();
+        const previous = lastDimensionScores(progressBeforeAttempt);
+        const bestScoreBefore = progressBeforeAttempt.exercises[exercise.id]?.bestScore ?? 0;
 
-      const coached = coachAttempt(exercise, text, audio, previous as Partial<Record<Dimension, number>>);
-      setResult(coached);
-      haptic('success');
+        const coached = coachAttempt(exercise, text, audio, previous as Partial<Record<Dimension, number>>);
+        setResult(coached);
+        haptic('success');
 
-      // Build per-dimension scores map for persistence.
-      const dims: Partial<Record<string, number>> = {};
-      for (const s of coached.scores) {
-        if (s.measured) dims[s.dimension] = s.score;
-      }
+        // Build per-dimension scores map for persistence.
+        const dims: Partial<Record<string, number>> = {};
+        for (const s of coached.scores) {
+          if (s.measured) dims[s.dimension] = s.score;
+        }
 
-      const saved = recordAttempt({
-        exerciseId: exercise.id,
-        score: coached.overallScore,
-        xp: coached.xpEarned,
-        wordCount: coached.wordCount,
-        dims,
-      });
-
-      setPostRecordProgress(saved.progress);
-
-      // Free-preview status: count distinct curriculum exercises attempted
-      // (free-play never burns a slot) before and after this take, so the
-      // "last free rep" moment fires exactly once — never on replays.
-      if (!isProCached() && exercise.id !== FREE_PLAY_ID) {
-        const distinctOf = (p: Progress) =>
-          Object.entries(p.exercises).filter(([id, e]) => e.attempts > 0 && id !== FREE_PLAY_ID).length;
-        const before = distinctOf(progressBeforeAttempt);
-        const after = distinctOf(saved.progress);
-        setFreePreview({
-          left: Math.max(0, FREE_EXERCISE_LIMIT - after),
-          justUsedLast: before < FREE_EXERCISE_LIMIT && after >= FREE_EXERCISE_LIMIT,
+        const saved = recordAttempt({
+          exerciseId: exercise.id,
+          score: coached.overallScore,
+          xp: coached.xpEarned,
+          wordCount: coached.wordCount,
+          dims,
         });
-        // Self-heal a stale cache (e.g. reinstall before Play restore ran):
-        // never show the upsell to someone who already owns Pro.
-        refreshEntitlement().then((pro) => pro && setFreePreview(null));
-      } else {
-        setFreePreview(null);
-      }
 
-      setReward({
-        streakIncreased: saved.streakIncreased,
-        goalReached: saved.goalReached,
-        streak: saved.progress.streak,
-      });
+        setPostRecordProgress(saved.progress);
 
-      // Evaluate achievements. graceUsedDay is written with the local dayKey,
-      // so compare local-to-local (a UTC slice misses mornings in UTC+ zones).
-      const graceUsedThisSession = saved.progress.graceUsedDay === dayKey();
-      const newIds = evaluateAchievements({
-        result: coached,
-        progress: saved.progress,
-        exerciseId: exercise.id,
-        graceUsedThisSession,
-        totalReps: saved.progress.history.length,
-      });
+        // Free-preview status: count distinct curriculum exercises attempted
+        // (free-play never burns a slot) before and after this take, so the
+        // "last free rep" moment fires exactly once — never on replays.
+        if (!isProCached() && exercise.id !== FREE_PLAY_ID) {
+          const distinctOf = (p: Progress) =>
+            Object.entries(p.exercises).filter(([id, e]) => e.attempts > 0 && id !== FREE_PLAY_ID).length;
+          const before = distinctOf(progressBeforeAttempt);
+          const after = distinctOf(saved.progress);
+          setFreePreview({
+            left: Math.max(0, FREE_EXERCISE_LIMIT - after),
+            justUsedLast: before < FREE_EXERCISE_LIMIT && after >= FREE_EXERCISE_LIMIT,
+          });
+          // Self-heal a stale cache (e.g. reinstall before Play restore ran):
+          // never show the upsell to someone who already owns Pro.
+          refreshEntitlement().then((pro) => pro && setFreePreview(null));
+        } else {
+          setFreePreview(null);
+        }
 
-      if (newIds.length > 0) {
-        const newAchievements = newIds.flatMap((id) => {
-          const a = ACHIEVEMENTS.find((x) => x.id === id);
-          return a ? [a] : [];
+        setReward({
+          streakIncreased: saved.streakIncreased,
+          goalReached: saved.goalReached,
+          streak: saved.progress.streak,
         });
-        setAchievementQueue(newAchievements);
-      }
 
-      // Celebration: new personal best, goal reached, or streak milestone.
-      const isNewPb = coached.overallScore > bestScoreBefore;
-      if (isNewPb || saved.goalReached || (saved.streakIncreased && saved.progress.streak >= 2)) {
-        setCelebrationShow(true);
-      }
+        // Evaluate achievements. graceUsedDay is written with the local dayKey,
+        // so compare local-to-local (a UTC slice misses mornings in UTC+ zones).
+        const graceUsedThisSession = saved.progress.graceUsedDay === dayKey();
+        const newIds = evaluateAchievements({
+          result: coached,
+          progress: saved.progress,
+          exerciseId: exercise.id,
+          graceUsedThisSession,
+          totalReps: saved.progress.history.length,
+        });
 
-      setPhase('results');
+        if (newIds.length > 0) {
+          const newAchievements = newIds.flatMap((id) => {
+            const a = ACHIEVEMENTS.find((x) => x.id === id);
+            return a ? [a] : [];
+          });
+          setAchievementQueue(newAchievements);
+        }
+
+        // Celebration: new personal best, goal reached, or streak milestone.
+        const isNewPb = coached.overallScore > bestScoreBefore;
+        if (isNewPb || saved.goalReached || (saved.streakIncreased && saved.progress.streak >= 2)) {
+          setCelebrationShow(true);
+        }
+
+        setPhase('results');
+      } catch (err: any) {
+        console.error(err);
+        setTranscribeStatus(null);
+        setError('Something went wrong analysing that take — sorry. Please try again.');
+        setPhase('intro');
+      }
     },
     [exercise]
   );
 
   const startRecording = useCallback(async () => {
+    warmUpTranscriber();
     setError(null);
     setTranscript('');
     transcriptRef.current = '';
@@ -297,6 +311,12 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
         const blob = new Blob(chunksRef.current, { type: blobType });
         setAudioUrl(URL.createObjectURL(blob));
         void finishAnalysis(blob);
+      };
+      recorder.onerror = () => {
+        cleanup();
+        setLevel(0);
+        setError('Recording failed — your microphone may have been interrupted. Please try again.');
+        setPhase('intro');
       };
       recorder.start();
 
@@ -340,7 +360,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
         setError('Microphone access is required. Please allow it and try again.');
       }
     }
-  }, [finishAnalysis]);
+  }, [cleanup, finishAnalysis]);
 
   const stopRecording = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);

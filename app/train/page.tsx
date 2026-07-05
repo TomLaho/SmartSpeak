@@ -51,9 +51,14 @@ export default function TrainHome() {
     setDailyGoalReps(loadDailyGoalReps());
 
     // First-run onboarding: show if flag not set AND no history
-    const onboarded = typeof window !== 'undefined'
-      ? window.localStorage.getItem(ONBOARDING_KEY)
-      : '1';
+    let onboarded: string | null = '1';
+    if (typeof window !== 'undefined') {
+      try {
+        onboarded = window.localStorage.getItem(ONBOARDING_KEY);
+      } catch {
+        onboarded = '1';
+      }
+    }
     if (!onboarded && p.history.length === 0) {
       setShowOnboarding(true);
     }
@@ -86,7 +91,11 @@ export default function TrainHome() {
 
   function dismissOnboarding() {
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem(ONBOARDING_KEY, '1');
+      try {
+        window.localStorage.setItem(ONBOARDING_KEY, '1');
+      } catch {
+        /* ignore */
+      }
     }
     setShowOnboarding(false);
   }
@@ -327,7 +336,11 @@ export default function TrainHome() {
       {/* Free Play — Open Mic */}
       {(() => {
         const freePlayAttempts = progress?.exercises[FREE_PLAY_ID]?.attempts ?? 0;
-        const freePlayAccessible = canAccessFreePlay({ pro, freePlayAttempts });
+        const freePlayAccessible = canAccessFreePlay({
+          pro,
+          freePlayAttempts,
+          lastFreePlayDate: progress?.exercises[FREE_PLAY_ID]?.lastDate ?? null,
+        });
         const href = freePlayAccessible ? `/train/exercise/${FREE_PLAY_ID}` : '/train/unlock';
         return (
           <Link
@@ -343,6 +356,11 @@ export default function TrainHome() {
                 {freePlayAccessible && !pro && freePlayAttempts === 0 && (
                   <span className="rounded-full bg-spotlight/20 px-2 py-0.5 text-[10px] font-bold text-spotlight">
                     1 free
+                  </span>
+                )}
+                {freePlayAccessible && !pro && freePlayAttempts > 0 && (
+                  <span className="rounded-full bg-spotlight/20 px-2 py-0.5 text-[10px] font-bold text-spotlight">
+                    Free this week
                   </span>
                 )}
                 {!freePlayAccessible && (

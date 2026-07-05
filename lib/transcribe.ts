@@ -115,3 +115,17 @@ export async function transcribeOnDevice(
     w.postMessage({ pcm: copy.buffer }, [copy.buffer]);
   });
 }
+
+/**
+ * Best-effort pre-load of the Whisper pipeline (~40 MB, one-time). Called when
+ * a take starts so the model downloads DURING the recording instead of after
+ * it. Safe to call repeatedly; does nothing where unsupported.
+ */
+export function warmUpTranscriber(): void {
+  if (!isOnDeviceTranscriptionSupported()) return;
+  try {
+    getWorker().postMessage({ type: 'warmup' });
+  } catch {
+    /* best-effort */
+  }
+}

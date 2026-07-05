@@ -16,6 +16,7 @@ import {
   isPlayBillingAvailable,
   purchasePro,
   refreshEntitlement,
+  getProPrice,
 } from '@/lib/entitlement';
 
 const PERKS = [
@@ -33,9 +34,11 @@ export default function UnlockPage() {
   // TWA users never see a flash of the wrong (Play-Store-link) button.
   const [billing, setBilling] = useState<boolean | null>(null);
   const [freeRepsLeft, setFreeRepsLeft] = useState<number | null>(null);
+  const [price, setPrice] = useState<string>(PRO_PRICE);
 
   useEffect(() => {
     setBilling(isPlayBillingAvailable());
+    getProPrice().then((p) => p && setPrice(p));
     // Honest headline copy: how much of the free preview is actually used?
     const p = loadProgress();
     const used = Object.entries(p.exercises).filter(
@@ -95,7 +98,7 @@ export default function UnlockPage() {
 
         <div className="mt-8 w-full max-w-sm rounded-2xl border border-spotlight/30 bg-spotlight/10 p-4">
           <p className="text-2xl font-bold">
-            {PRO_PRICE} <span className="text-sm font-normal text-white/55">· one-time · yours forever</span>
+            {price} <span className="text-sm font-normal text-white/55">· one-time · yours forever</span>
           </p>
           <p className="mt-1 text-xs text-white/45">No subscription. Pay once, unlock on every device on your account.</p>
           <p className="mt-1 text-xs text-white/45">A speaking coach runs $100+ an hour.</p>
@@ -141,7 +144,7 @@ export default function UnlockPage() {
               size="lg"
               className="h-14 w-full rounded-2xl bg-spotlight text-ink text-base font-semibold hover:bg-spotlight-soft disabled:opacity-60"
             >
-              {busy ? 'Please wait…' : `Unlock for ${PRO_PRICE}`}
+              {busy ? 'Please wait…' : `Unlock for ${price}`}
             </Button>
             <button
               onClick={restore}
