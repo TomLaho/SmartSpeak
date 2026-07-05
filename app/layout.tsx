@@ -35,13 +35,13 @@ export const metadata: Metadata = {
     siteName: siteConfig.name,
     title: `${siteConfig.name} — Presentation coach for work`,
     description: siteConfig.description,
-    images: [{ url: '/icon-512.png', width: 512, height: 512, alt: 'SmartSpeak' }],
+    images: [{ url: '/og-image.png', width: 1024, height: 500, alt: 'SmartSpeak — pocket presentation coach' }],
   },
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
     title: `${siteConfig.name} — Presentation coach for work`,
     description: siteConfig.description,
-    images: ['/icon-512.png'],
+    images: ['/og-image.png'],
   },
 };
 

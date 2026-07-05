@@ -143,8 +143,9 @@ the purchase without being charged.
       the 512 also serves the `maskable` purpose. When you run PWABuilder/Bubblewrap,
       eyeball the maskable preview — if the white mark clips under the launcher's circle
       crop, export a dedicated maskable PNG with more padding (content in the inner 80%).
-- [ ] **`assetlinks.json`** — not in the repo yet; add it under `public/.well-known/`
-      with the Play App Signing SHA-256 (step 2) or the TWA will show the URL bar.
+- [ ] **`assetlinks.json`** — in the repo at `public/.well-known/assetlinks.json`, but
+      still has the placeholder `REPLACE_WITH_PLAY_APP_SIGNING_SHA256`; swap in the real
+      Play App Signing SHA-256 (step 2) or the TWA will show the URL bar.
 - [ ] **Microphone permission in the TWA** — tick "Microphone" during `bubblewrap init`
       (adds `RECORD_AUDIO` to `AndroidManifest.xml`); otherwise mic is blocked in the WebView.
 - [ ] **Purchase acknowledgement** (step 3) — `lib/entitlement.ts` swallows an
