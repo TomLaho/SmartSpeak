@@ -3,14 +3,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getExercise, pickVariation, BENCHMARKS } from '@/lib/exercises';
+import { EXERCISES, getExercise, pickVariation, BENCHMARKS } from '@/lib/exercises';
 import { analyzeAudioInWorker, type AudioMetrics } from '@/lib/audio-analysis';
 import { coachAttempt, type CoachResult } from '@/lib/coach';
 import { loadCalibration, toCalibrationInput } from '@/lib/calibration';
 import { transcribeOnDevice, isOnDeviceTranscriptionSupported, type TranscribeProgress } from '@/lib/transcribe';
-import { isProCached, refreshEntitlement, canAccessExercise, canAccessFreePlay } from '@/lib/entitlement';
+import {
+  isProCached,
+  refreshEntitlement,
+  canAccessExercise,
+  canAccessFreePlay,
+  FREE_EXERCISE_LIMIT,
+  PRO_PRICE,
+} from '@/lib/entitlement';
 import { FREE_PLAY_ID } from '@/lib/exercises';
 import {
+  dayKey,
   loadProgress,
   recordAttempt,
   dimensionTrend,
@@ -64,6 +72,11 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
 
   // Progress snapshot captured after recordAttempt for sparklines.
   const [postRecordProgress, setPostRecordProgress] = useState<Progress | null>(null);
+
+  // Free-preview status for the results screen (null = Pro user or free-play rep).
+  // justUsedLast marks the take that consumed the final free slot — the one
+  // moment the results screen makes the Pro offer prominently.
+  const [freePreview, setFreePreview] = useState<{ left: number; justUsedLast: boolean } | null>(null);
 
   // Recording infra refs.
   const streamRef = useRef<MediaStream | null>(null);
@@ -203,15 +216,34 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
 
       setPostRecordProgress(saved.progress);
 
+      // Free-preview status: count distinct curriculum exercises attempted
+      // (free-play never burns a slot) before and after this take, so the
+      // "last free rep" moment fires exactly once — never on replays.
+      if (!isProCached() && exercise.id !== FREE_PLAY_ID) {
+        const distinctOf = (p: Progress) =>
+          Object.entries(p.exercises).filter(([id, e]) => e.attempts > 0 && id !== FREE_PLAY_ID).length;
+        const before = distinctOf(progressBeforeAttempt);
+        const after = distinctOf(saved.progress);
+        setFreePreview({
+          left: Math.max(0, FREE_EXERCISE_LIMIT - after),
+          justUsedLast: before < FREE_EXERCISE_LIMIT && after >= FREE_EXERCISE_LIMIT,
+        });
+        // Self-heal a stale cache (e.g. reinstall before Play restore ran):
+        // never show the upsell to someone who already owns Pro.
+        refreshEntitlement().then((pro) => pro && setFreePreview(null));
+      } else {
+        setFreePreview(null);
+      }
+
       setReward({
         streakIncreased: saved.streakIncreased,
         goalReached: saved.goalReached,
         streak: saved.progress.streak,
       });
 
-      // Evaluate achievements.
-      const today = new Date().toISOString().slice(0, 10);
-      const graceUsedThisSession = saved.progress.graceUsedDay === today;
+      // Evaluate achievements. graceUsedDay is written with the local dayKey,
+      // so compare local-to-local (a UTC slice misses mornings in UTC+ zones).
+      const graceUsedThisSession = saved.progress.graceUsedDay === dayKey();
       const newIds = evaluateAchievements({
         result: coached,
         progress: saved.progress,
@@ -345,8 +377,12 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     setAchievementQueue([]);
     setCurrentAchievement(null);
     setPostRecordProgress(null);
+    setFreePreview(null);
+    // Re-read the attempt count so pickVariation advances to the next
+    // variation (the mount-time value goes stale after a recorded take).
+    if (exercise) setAttemptCount(loadProgress().exercises[exercise.id]?.attempts ?? 0);
     setPhase('intro');
-  }, [cleanup]);
+  }, [cleanup, exercise]);
 
   if (!exercise) {
     return (
@@ -452,6 +488,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
           onCelebrationDone={() => setCelebrationShow(false)}
           currentAchievement={currentAchievement}
           onAchievementDone={() => setCurrentAchievement(null)}
+          freePreview={freePreview}
         />
       )}
     </div>
@@ -691,6 +728,7 @@ function ResultsView({
   onCelebrationDone,
   currentAchievement,
   onAchievementDone,
+  freePreview,
 }: {
   result: CoachResult;
   metrics: AudioMetrics;
@@ -709,6 +747,7 @@ function ResultsView({
   onCelebrationDone: () => void;
   currentAchievement: Achievement | null;
   onAchievementDone: () => void;
+  freePreview: { left: number; justUsedLast: boolean } | null;
 }) {
   // Score ring color by tier.
   const scoreColor =
@@ -773,6 +812,29 @@ function ResultsView({
                 {result.primaryCue}
               </p>
             </div>
+          )}
+
+          {/* The post-value Pro moment — shown once, on the take that used the
+              final free slot. Replays and remaining-rep states get the subtle
+              footnote at the bottom of the results instead. */}
+          {freePreview?.justUsedLast && (
+            <Link
+              href="/train/unlock"
+              className="block rounded-2xl border border-spotlight/40 bg-gradient-to-br from-spotlight/20 to-spotlight/5 p-4 transition-transform active:scale-[0.99]"
+            >
+              <p className="text-xs font-semibold uppercase tracking-wide text-spotlight">
+                Free preview complete
+              </p>
+              <p className="mt-1.5 text-base font-semibold leading-snug">
+                That was your last free rep — nice work.
+              </p>
+              <p className="mt-1 text-sm text-white/60">
+                Keep the streak going with all {EXERCISES.length} scenarios. {PRO_PRICE} one-time, yours forever.
+              </p>
+              <span className="mt-3 inline-block rounded-full bg-spotlight px-4 py-2 text-sm font-semibold text-ink">
+                See what&apos;s in Pro
+              </span>
+            </Link>
           )}
 
           {/* Self-review playback + delivery timeline */}
@@ -887,6 +949,18 @@ function ResultsView({
               Re-score
             </Button>
           </div>
+
+          {/* Free-preview footnote (skipped on the take that shows the hero card) */}
+          {freePreview && !freePreview.justUsedLast && (
+            <Link
+              href="/train/unlock"
+              className="block pb-1 text-center text-xs text-white/40 transition-colors hover:text-white/60"
+            >
+              {freePreview.left > 0
+                ? `${freePreview.left} free rep${freePreview.left === 1 ? '' : 's'} left · Pro unlocks all ${EXERCISES.length} scenarios`
+                : `Free preview used · Pro unlocks all ${EXERCISES.length} scenarios`}
+            </Link>
+          )}
         </div>
 
         <div className="mt-3 flex gap-3">

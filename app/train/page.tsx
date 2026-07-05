@@ -242,8 +242,9 @@ export default function TrainHome() {
         </Link>
       )}
 
-      {/* Free-preview progress (gentle conversion nudge) */}
-      {!pro && distinctAttempted < FREE_EXERCISE_LIMIT && (
+      {/* Free-preview progress (gentle conversion nudge). Held back until the
+          first rep is done — value before any ask (engagement-first). */}
+      {!pro && distinctAttempted >= 1 && distinctAttempted < FREE_EXERCISE_LIMIT && (
         <Link
           href="/train/unlock"
           className="mb-5 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3.5"
