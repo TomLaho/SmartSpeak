@@ -25,7 +25,7 @@ const moments = [
 
 const steps = [
   { title: 'Pick a work moment', desc: 'A short, guided rep from the Delivery, Structure or Influence path.' },
-  { title: 'Record one take', desc: 'Speak right in your browser. Live transcript, nothing to install.' },
+  { title: 'Record one take', desc: 'Speak right in your browser. Private on-device analysis — nothing installed, nothing uploaded.' },
   { title: 'Get instant coaching', desc: 'Real pace, pause, emphasis and structure scores — plus one concrete fix.' },
   { title: 'Walk in ready', desc: 'Earn XP, keep your streak, and watch your scores climb before the meeting.' },
 ];
