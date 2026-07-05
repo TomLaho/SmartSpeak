@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { loadProgress, resetProgress, loadDailyGoalReps, saveDailyGoalReps, levelFor, type Progress } from '@/lib/local-store';
 import { isProCached, refreshEntitlement, PRO_PRICE } from '@/lib/entitlement';
+import { EXERCISES } from '@/lib/exercises';
 import { Button } from '@/components/ui/button';
 import { MicCalibration } from '@/components/train/mic-calibration';
 import { cn } from '@/lib/utils';
@@ -104,7 +105,7 @@ export default function ProfilePage() {
             <p className="mt-1 text-sm text-white/55">
               {pro
                 ? 'All reps unlocked — thanks for your support!'
-                : `Unlock all 15 work-scenario reps · ${PRO_PRICE}, one-time.`}
+                : `Unlock all ${EXERCISES.length} work-scenario reps · ${PRO_PRICE}, one-time.`}
             </p>
           </div>
           {pro && (

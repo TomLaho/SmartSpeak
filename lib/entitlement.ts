@@ -19,6 +19,16 @@ const PRODUCT_ID = 'pro_unlock';
 const PLAY_BILLING = 'https://play.google.com/billing';
 const KEY = 'smartspeak.pro.v1';
 
+/**
+ * Public Play Store listing (package id from PLAY_LISTING.md). Purchases only
+ * work inside the TWA, so surfaces without Play Billing send users here.
+ *
+ * STORE_LIVE gates every user-facing link to this URL: it 404s until the app
+ * is published. Flip to true the day the listing goes live on Google Play.
+ */
+export const STORE_LIVE = false;
+export const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=app.smartspeak.twa';
+
 export const FREE_EXERCISE_LIMIT = 3;
 export const PRO_PRICE = '$10';
 
