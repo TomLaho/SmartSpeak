@@ -41,6 +41,7 @@ export default function TrainHome() {
   const [pro, setPro] = useState(false);
   const [dailyGoalReps, setDailyGoalReps] = useState(1);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [evening, setEvening] = useState(false);
 
   useEffect(() => {
     const p = loadProgress();
@@ -49,11 +50,17 @@ export default function TrainHome() {
     setPro(isProCached());
     refreshEntitlement().then(setPro);
     setDailyGoalReps(loadDailyGoalReps());
+    setEvening(new Date().getHours() >= 17);
 
     // First-run onboarding: show if flag not set AND no history
-    const onboarded = typeof window !== 'undefined'
-      ? window.localStorage.getItem(ONBOARDING_KEY)
-      : '1';
+    let onboarded: string | null = '1';
+    if (typeof window !== 'undefined') {
+      try {
+        onboarded = window.localStorage.getItem(ONBOARDING_KEY);
+      } catch {
+        onboarded = '1';
+      }
+    }
     if (!onboarded && p.history.length === 0) {
       setShowOnboarding(true);
     }
@@ -86,7 +93,11 @@ export default function TrainHome() {
 
   function dismissOnboarding() {
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem(ONBOARDING_KEY, '1');
+      try {
+        window.localStorage.setItem(ONBOARDING_KEY, '1');
+      } catch {
+        /* ignore */
+      }
     }
     setShowOnboarding(false);
   }
@@ -171,6 +182,19 @@ export default function TrainHome() {
         </div>
       </div>
 
+      {/* Streak-at-risk nudge: evening, active streak, nothing practised yet today */}
+      {evening && (progress?.streak ?? 0) >= 2 && repsCompletedToday === 0 && (
+        <Link
+          href={upNextAccessible ? `/train/exercise/${upNext.id}` : '/train/unlock'}
+          className="mb-5 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3.5"
+        >
+          <span className="text-lg">🔥</span>
+          <p className="flex-1 text-sm text-white/70">
+            Your {progress?.streak ?? 0}-day streak is on the line — one 1-minute rep keeps it alive.
+          </p>
+        </Link>
+      )}
+
       {/* Mic calibration nudge (dismissible, one-time) */}
       {showCalNudge && (
         <div className="mb-5 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
@@ -242,8 +266,9 @@ export default function TrainHome() {
         </Link>
       )}
 
-      {/* Free-preview progress (gentle conversion nudge) */}
-      {!pro && distinctAttempted < FREE_EXERCISE_LIMIT && (
+      {/* Free-preview progress (gentle conversion nudge). Held back until the
+          first rep is done — value before any ask (engagement-first). */}
+      {!pro && distinctAttempted >= 1 && distinctAttempted < FREE_EXERCISE_LIMIT && (
         <Link
           href="/train/unlock"
           className="mb-5 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3.5"
@@ -286,7 +311,9 @@ export default function TrainHome() {
                       </span>
                     </div>
                     <p className="mt-0.5 truncate text-xs text-white/45">{module.blurb}</p>
-                    <p className="mt-1 text-[10px] font-semibold text-spotlight/80">Unlock · {PRO_PRICE}</p>
+                    <p className="mt-1 text-[10px] font-semibold text-spotlight/80">
+                      {distinctAttempted === 0 ? 'Included in Pro' : `Unlock · ${PRO_PRICE}`}
+                    </p>
                   </div>
                   <span className="shrink-0 text-white/30">›</span>
                 </Link>
@@ -326,7 +353,11 @@ export default function TrainHome() {
       {/* Free Play — Open Mic */}
       {(() => {
         const freePlayAttempts = progress?.exercises[FREE_PLAY_ID]?.attempts ?? 0;
-        const freePlayAccessible = canAccessFreePlay({ pro, freePlayAttempts });
+        const freePlayAccessible = canAccessFreePlay({
+          pro,
+          freePlayAttempts,
+          lastFreePlayDate: progress?.exercises[FREE_PLAY_ID]?.lastDate ?? null,
+        });
         const href = freePlayAccessible ? `/train/exercise/${FREE_PLAY_ID}` : '/train/unlock';
         return (
           <Link
@@ -342,6 +373,11 @@ export default function TrainHome() {
                 {freePlayAccessible && !pro && freePlayAttempts === 0 && (
                   <span className="rounded-full bg-spotlight/20 px-2 py-0.5 text-[10px] font-bold text-spotlight">
                     1 free
+                  </span>
+                )}
+                {freePlayAccessible && !pro && freePlayAttempts > 0 && (
+                  <span className="rounded-full bg-spotlight/20 px-2 py-0.5 text-[10px] font-bold text-spotlight">
+                    Free this week
                   </span>
                 )}
                 {!freePlayAccessible && (

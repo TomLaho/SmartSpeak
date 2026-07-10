@@ -19,6 +19,16 @@ const PRODUCT_ID = 'pro_unlock';
 const PLAY_BILLING = 'https://play.google.com/billing';
 const KEY = 'smartspeak.pro.v1';
 
+/**
+ * Public Play Store listing (package id from PLAY_LISTING.md). Purchases only
+ * work inside the TWA, so surfaces without Play Billing send users here.
+ *
+ * STORE_LIVE gates every user-facing link to this URL: it 404s until the app
+ * is published. Flip to true the day the listing goes live on Google Play.
+ */
+export const STORE_LIVE = false;
+export const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=app.smartspeak.twa';
+
 export const FREE_EXERCISE_LIMIT = 3;
 export const PRO_PRICE = '$10';
 
@@ -81,6 +91,24 @@ export async function refreshEntitlement(): Promise<boolean> {
   }
 }
 
+/**
+ * Store-formatted price of the Pro unlock from Play (e.g. "$14.99" in the
+ * buyer's local currency), or null outside the TWA / on any failure. Play's
+ * console price is authoritative — PRO_PRICE is the display fallback.
+ */
+export async function getProPrice(): Promise<string | null> {
+  try {
+    const service = await getService();
+    if (!service?.getDetails) return null;
+    const details = await service.getDetails([PRODUCT_ID]);
+    const amount = details?.[0]?.price;
+    if (!amount?.value || !amount?.currency) return null;
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency: amount.currency }).format(Number(amount.value));
+  } catch {
+    return null;
+  }
+}
+
 export type PurchaseResult = { ok: true } | { ok: false; reason: 'unavailable' | 'cancelled' | 'error' };
 
 /** Launch the Google Play purchase flow for the Pro unlock. */
@@ -139,10 +167,21 @@ export function isModuleUnlocked(args: { pro: boolean; order: number }): boolean
   return args.pro || args.order <= FREE_MODULE_LIMIT;
 }
 
-/** Free uses of the Open Mic free-play exercise for non-Pro users. */
+/** Free uses of the Open Mic free-play exercise per rolling 7-day window. */
 export const FREE_PLAY_FREE_USES = 1;
 
-/** Whether the user can access Open Mic. Pro users: unlimited; free users: one use. */
-export function canAccessFreePlay(args: { pro: boolean; freePlayAttempts: number }): boolean {
-  return args.pro || args.freePlayAttempts < FREE_PLAY_FREE_USES;
+/**
+ * Whether the user can access Open Mic. Pro users: unlimited. Free users get
+ * FREE_PLAY_FREE_USES uses, then recharge once 7 full days have passed since
+ * their last free-play attempt.
+ */
+export function canAccessFreePlay(args: {
+  pro: boolean;
+  freePlayAttempts: number;
+  lastFreePlayDate?: string | null;
+}): boolean {
+  if (args.pro || args.freePlayAttempts === 0) return true;
+  if (!args.lastFreePlayDate) return false;
+  const daysSince = (Date.now() - new Date(args.lastFreePlayDate).getTime()) / 86400000;
+  return isFinite(daysSince) && daysSince >= 7;
 }

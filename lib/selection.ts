@@ -18,7 +18,7 @@
 
 import { EXERCISES, exercisesByModule, moduleForExercise, type Exercise, type ModuleId } from './exercises';
 import { isModuleUnlocked } from './entitlement';
-import type { Progress } from './local-store';
+import { dayKey, type Progress } from './local-store';
 
 // ─────────────────── Helpers ───────────────────
 
@@ -96,10 +96,6 @@ function daysBetweenDates(a: string, b: string): number {
   return Math.round(ms / 86400000);
 }
 
-function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 /**
  * Recommend the next exercise for the presenter to work on.
  *
@@ -113,7 +109,7 @@ export function recommendNext(
   progress: Progress,
   pro: boolean
 ): { exercise: Exercise; reason: string } {
-  const today = todayKey();
+  const today = dayKey();
 
   // Only ever recommend exercises the user can actually open. Unmapped
   // exercises (none today) are treated as accessible so nothing silently hides.
@@ -127,7 +123,7 @@ export function recommendNext(
     const ep = progress.exercises[ex.id];
     if (!ep) continue;
     if (ep.lastScore >= 60) continue;
-    const lastDate = ep.lastDate ? ep.lastDate.slice(0, 10) : null;
+    const lastDate = ep.lastDate ? dayKey(new Date(ep.lastDate)) : null;
     if (lastDate && daysBetweenDates(lastDate, today) >= 1) {
       return {
         exercise: ex,

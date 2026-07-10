@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { loadProgress, resetProgress, loadDailyGoalReps, saveDailyGoalReps, levelFor, type Progress } from '@/lib/local-store';
 import { isProCached, refreshEntitlement, PRO_PRICE } from '@/lib/entitlement';
+import { GOOGLE_CALENDAR_REMINDER_URL, downloadPracticeReminderIcs } from '@/lib/reminder';
+import { EXERCISES } from '@/lib/exercises';
 import { Button } from '@/components/ui/button';
 import { MicCalibration } from '@/components/train/mic-calibration';
 import { cn } from '@/lib/utils';
@@ -81,6 +83,28 @@ export default function ProfilePage() {
         </p>
       </div>
 
+      {/* Daily reminder — zero-backend: put the rep in the user's own calendar */}
+      <div className="mb-6 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+        <p className="font-semibold text-white/80">⏰ Daily reminder</p>
+        <p className="mt-1 text-sm text-white/55">
+          Put a 1-minute practice slot in your calendar — streaks live and die by a fixed time.
+        </p>
+        <div className="mt-3 flex gap-2">
+          <Button asChild className="h-10 rounded-xl bg-spotlight text-ink hover:bg-spotlight/90">
+            <a href={GOOGLE_CALENDAR_REMINDER_URL} target="_blank" rel="noopener noreferrer">
+              Add to Google Calendar
+            </a>
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={downloadPracticeReminderIcs}
+            className="h-10 rounded-xl text-white/60 hover:bg-white/10 hover:text-white/80"
+          >
+            .ics file
+          </Button>
+        </div>
+      </div>
+
       {/* Privacy note */}
       <div className="mb-6 rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-white/60">
         <p className="font-semibold text-white/80">🔒 Private by design</p>
@@ -104,7 +128,7 @@ export default function ProfilePage() {
             <p className="mt-1 text-sm text-white/55">
               {pro
                 ? 'All reps unlocked — thanks for your support!'
-                : `Unlock all 15 work-scenario reps · ${PRO_PRICE}, one-time.`}
+                : `Unlock all ${EXERCISES.length} work-scenario reps · ${PRO_PRICE}, one-time.`}
             </p>
           </div>
           {pro && (

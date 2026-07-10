@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { SwRegister } from '@/components/sw-register';
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://smartspeak-app.netlify.app'),
   applicationName: siteConfig.name,
   title: {
     default: `${siteConfig.name} — Presentation coach for work`,
@@ -26,6 +27,21 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: 'black-translucent',
     title: siteConfig.name,
+  },
+  // Rich link previews when the app is shared in chat/social — a share is the
+  // cheapest acquisition channel a zero-budget launch has.
+  openGraph: {
+    type: 'website',
+    siteName: siteConfig.name,
+    title: `${siteConfig.name} — Presentation coach for work`,
+    description: siteConfig.description,
+    images: [{ url: '/og-image.png', width: 1024, height: 500, alt: 'SmartSpeak — pocket presentation coach' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: `${siteConfig.name} — Presentation coach for work`,
+    description: siteConfig.description,
+    images: ['/og-image.png'],
   },
 };
 

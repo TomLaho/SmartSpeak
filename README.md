@@ -37,7 +37,6 @@ The trainer is a standalone, installable PWA, which is the recommended on-ramp t
 - `lib/exercises.ts` the exercise curriculum (Delivery, Structure, Influence & Q&A paths)
 - `lib/audio-analysis.ts` on-device Web Audio analysis (pace, pauses, energy, pitch)
 - `lib/transcribe.ts` / `lib/transcribe.worker.ts` on-device Whisper transcription (self-hosted model)
-- `lib/speech-recognition.ts` browser Speech Recognition wrapper
 - `lib/coach.ts` deterministic, on-device delivery + structure/content scoring
 - `lib/local-store.ts` zero-backend progress/streak/XP store (`localStorage`)
 - `lib/entitlement.ts` free-preview gating + Play Billing (Digital Goods) unlock

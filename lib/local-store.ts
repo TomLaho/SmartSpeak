@@ -59,7 +59,7 @@ const EMPTY: Progress = {
   history: [],
 };
 
-function dayKey(d = new Date()): string {
+export function dayKey(d = new Date()): string {
   // Use local calendar date so streaks/daily-goal are correct for non-UTC users (e.g. AEST UTC+10/+11).
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -91,7 +91,11 @@ export function loadProgress(): Progress {
     let mutated = false;
     if (parsed.lastPracticeDay) {
       const gap = daysBetween(parsed.lastPracticeDay, dayKey());
-      if (gap > 1) {
+      // A grace granted earlier today already covers this gap. Skip
+      // re-evaluation: canUseGrace would now see the grace as "used today"
+      // and the else branch would wipe the streak on the second load.
+      const graceCoversToday = gap === 2 && parsed.graceUsedDay === dayKey();
+      if (gap > 1 && !graceCoversToday) {
         // Gap of exactly 2 days: apply a grace day if available (one per 7 days).
         if (gap === 2 && canUseGrace(parsed)) {
           parsed.graceUsedDay = dayKey();
@@ -161,11 +165,14 @@ export function recordAttempt(input: RecordInput): {
     streakIncreased = true;
   }
 
-  const goalBefore = progress.todayXp >= DAILY_GOAL_XP;
+  // The daily goal is reps-based, matching the home-screen ring (todayXp is
+  // still tracked for back-compat with stored progress shapes).
+  const goalReps = loadDailyGoalReps();
+  const repsBefore = repsToday(progress);
   progress.xp += input.xp;
   progress.todayXp += input.xp;
   progress.todayDay = today;
-  const goalReached = !goalBefore && progress.todayXp >= DAILY_GOAL_XP;
+  const goalReached = repsBefore < goalReps && repsBefore + 1 >= goalReps;
 
   const ex = progress.exercises[input.exerciseId] || {
     attempts: 0,
@@ -331,8 +338,10 @@ export function saveDailyGoalReps(n: number): void {
 
 /** Count how many attempts the user has completed today. */
 export function repsToday(progress: Progress): number {
+  // Attempt dates are stored as UTC ISO strings; compare local calendar days
+  // (a.date.slice(0, 10) would be the UTC day and undercounts mornings in UTC+ zones).
   const today = dayKey();
-  return progress.history.filter((a) => a.date.slice(0, 10) === today).length;
+  return progress.history.filter((a) => dayKey(new Date(a.date)) === today).length;
 }
 
 // ──────────────────── Pre-rep challenge key ───────────────────

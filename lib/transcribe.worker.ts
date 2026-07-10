@@ -35,6 +35,18 @@ function getASR(onProgress: (p: any) => void): Promise<Pipeline> {
 const ctx: any = self;
 
 ctx.onmessage = async (e: MessageEvent) => {
+  if (e.data?.type === 'warmup') {
+    // Fire-and-forget model pre-load. Never post 'result'/'error' from here —
+    // client listeners are not correlated to requests and a posted error would
+    // reject a concurrent real transcription. Progress messages are fine (the
+    // client renders them as download progress).
+    try {
+      await getASR((p) => ctx.postMessage({ type: 'progress', data: p }));
+    } catch {
+      asrPromise = null; // let the next real request retry the load
+    }
+    return;
+  }
   const { pcm } = (e.data ?? {}) as { pcm: ArrayBuffer };
   try {
     const asr = await getASR((p) => ctx.postMessage({ type: 'progress', data: p }));

@@ -9,6 +9,7 @@ import {
   type Progress,
 } from '@/lib/local-store';
 import { ACHIEVEMENTS, loadUnlockedAchievements, loadUnlockedIds, type Achievement } from '@/lib/achievements';
+import { cn } from '@/lib/utils';
 import { Ring } from '@/components/train/ring';
 import { LevelBar } from '@/components/train/level-bar';
 import { Sparkline } from '@/components/train/sparkline';
@@ -177,8 +178,4 @@ function Tile({ value, label, emoji }: { value: string; label: string; emoji: st
       <p className="mt-1 text-[11px] text-white/45">{label}</p>
     </div>
   );
-}
-
-function cn(...classes: (string | boolean | undefined | null)[]): string {
-  return classes.filter(Boolean).join(' ');
 }
