@@ -8,3 +8,8 @@ out
 
 # TypeScript incremental build cache
 tsconfig.tsbuildinfo
+
+# TWA build artifacts (contain signing key — never commit)
+Google Play package.zip
+*.keystore
+.twa-inspect/
