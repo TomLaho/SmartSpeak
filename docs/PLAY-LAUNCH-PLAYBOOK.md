@@ -15,7 +15,7 @@ Follow top to bottom. One action per step. Don't skip, don't reorder.
 | Android App Bundle (`.aab`) | ✅ Built + verified (mic permission, billing, correct package) |
 | Upload signing key | ✅ Created — **you must back it up (Step 1)** |
 | Digital asset links (kills the URL bar) | ✅ Done — both upload key and Google's App-signing key are live |
-| Privacy policy URL in Play Console | ❌ Not done (Step 5) |
+| Privacy policy URL in Play Console | ✅ Done |
 | `pro_unlock` in-app product | ❌ Not done (Step 10) |
 | Closed test (12 testers / 14 days) | ❌ Not started (Step 11) — **this is the long pole** |
 
@@ -35,8 +35,9 @@ Check which account type you have: Play Console → **Settings** (gear, bottom-l
 | File | Use it? |
 |---|---|
 | `C:\Users\lahog\Desktop\smartspeak-v3-app-release.aab` | ✅ **THIS ONE.** Version code 3 — verified mic + billing + new splash. Already on your Desktop. |
-| `C:\Users\lahog\ClaudeCode\smartspeak-twa\app\build\outputs\bundle\release\app-release.aab` | ✅ Same file, at its build location. |
-| `C:\Users\lahog\ClaudeCode\SmartSpeak\Google Play package\SmartSpeak.aab` | ❌ **NEVER.** Old broken build — microphone doesn't work. Safe to delete the whole folder. |
+| `C:\Users\lahog\ClaudeCode\SmartSpeak\android\app\build\outputs\bundle\release\app-release.aab` | ✅ Same file, at its build location. |
+
+> The Android wrapper project now lives at `SmartSpeak\android\` (moved from `ClaudeCode\smartspeak-twa\`). It is git-ignored in full because it contains your keystore and its password — **never force-add anything under `android/` to git.**
 
 ---
 
@@ -193,6 +194,23 @@ Skip any field marked optional. Speed over polish — you can edit all of this l
 > - It is **public** on your store listing, so it will attract spam. Make sure it's filtered, not forwarded raw to your main inbox.
 > - It publicly links SmartSpeak to Kairo Analytics. If you'd rather keep the app and the consulting brand separate — different audiences, different positioning — set up `hello@smartspeak.app` or similar instead. Purely a branding call; there's no technical difference. You can change it any time.
 
+#### ☐ Keeping SmartSpeak mail out of your Kairo inbox
+
+`info@` forwards into `tom@`, so without a rule every app user and every Play notice lands in your main working inbox. Best practice, in order of how much it's worth doing:
+
+1. **☐ Filter on the delivery address, not the sender.** This is the key trick — it catches *everything* sent to `info@` regardless of who sent it. In Gmail: **Settings** (gear) → **See all settings** → **Filters and Blocked Addresses** → **Create a new filter**. In the **To** field enter:
+   ```
+   info@kairoanalytics.com
+   ```
+   → **Create filter** → tick **Skip the Inbox (Archive it)** and **Apply the label** → **New label** → `SmartSpeak`. → **Create filter**.
+   - ✅ **Done when:** a test email to `info@` lands under the SmartSpeak label and not in your inbox.
+2. **☐ Do *not* tick "Mark as read".** You want the unread count on the label as your prompt to check it — otherwise support mail silently rots and Play's policy notices go unseen.
+3. **☐ Add a sub-label for the automated mail.** A second filter on `From: googleplay-noreply@google.com` → label `SmartSpeak/Play`. Keeps genuine user mail visible and separates it from release/policy notifications.
+4. **☐ Check it on a schedule, not on arrival.** Once a day is plenty at this stage, and it protects your focus. Put a recurring 5-minute slot in your calendar rather than relying on noticing it.
+5. **☐ Set up a canned reply** for the two questions you'll get most (how to cancel/refund, and "it doesn't hear me"). Gmail → Settings → Advanced → enable **Templates**.
+
+> **Do not auto-reply to users.** An autoresponder on a public support address invites spam loops and reads as unserious for a paid app. Manual replies, once a day.
+
 > **Data safety hint:** SmartSpeak records audio. Declare that you collect audio, state whether it leaves the device, and that it's used for app functionality. Be accurate — a false declaration here gets apps pulled.
 
 ### ☐ Step 10 — Create the `pro_unlock` product (10 min)
@@ -260,6 +278,31 @@ If you are on a personal account, in order of preference:
 
 **Testers must actually engage.** Google looks at whether testers genuinely used the app, not just that 12 accounts opted in. Ask people to open it a few times across the two weeks, not once on day one.
 
+### ☐ Step 11c — Where to find the reciprocal-testing groups
+
+I can't verify specific Telegram channels are currently active, safe, or not scams — they appear and disappear constantly, and I'd be guessing if I named one. **Search, don't trust a link someone hands you.** Work in this order:
+
+1. **☐ Reddit first — this is the safest option and doesn't need Telegram at all.**
+   - `r/AndroidClosedTesting` — purpose-built for exactly this, with post templates and a swap culture
+   - `r/TestMyApp`, `r/androidapps`
+   - Read the subreddit rules before posting. Most require you to test others first or post in a specific format.
+2. **☐ Then Telegram/Discord, if you need more people.** In Telegram search, try: `Google Play closed testing`, `closed testing exchange`, `14 days testers`. Judge a group by: is it active *today*, do people post real opt-in links, is there a rule about reciprocity, and is anyone asking for money? Leave any group that asks for payment.
+3. **☐ Post like this:**
+   > Closed testing swap — SmartSpeak, a 1-minute-a-day speaking practice app. Opt-in: `https://play.google.com/apps/testing/app.smartspeak.twa`. I'll test yours for the full 14 days, drop your link and I'll join. Australian timezone, responsive.
+
+#### ⚠️ Risks to actually pay attention to
+
+| Risk | Real? | What to do |
+|---|---|---|
+| **Someone copies the app** | **Low, but real.** Your entire app is a public website — anyone can view-source it today, without being a tester. Testing changes nothing. | Don't try to hide it. Your moat is iteration speed and the store listing/reviews, not the code. |
+| **Someone clones the *store listing*** — same name, your screenshots | **Moderate.** This does happen with copycat devs. | Take the name on Play early (you have), and report impersonation via Play Console → Policy. Consider a trade mark only if it gets traction. |
+| **A "tester service" gets your account flagged** | **High if you pay for testers.** | Don't buy testers. |
+| **Malicious link in a Telegram group** | **Moderate.** Groups like these attract phishing. | Never enter your Google password anywhere except `accounts.google.com`. Never install an APK someone DMs you — only install through the Play Store link. |
+| **Your `pro_unlock` paywall being bypassed** | **High — inherent to the architecture.** Entitlement is checked client-side in a web app; a determined user can bypass it. | Accept it for now. It's the standard trade-off for a TWA, and casual users won't. Revisit only if revenue justifies a server. |
+| **Testers seeing your Netlify URL / repo** | Low. | Already handled — asset links hide the URL bar, and the repo has no secrets (keystore is git-ignored). |
+
+**The honest summary:** the copying risk is much lower than it feels. A speaking-practice app's value is in the exercise design, the scoring model and the habit loop you keep refining — not in code someone can lift in an afternoon. Ship it.
+
 **Tell your testers, word for word:**
 > "Tap this link, tap Become a tester, install SmartSpeak, and open it a few times over the next two weeks. **Do not uninstall it and do not leave the tester program** — if you drop out, the 14-day counter resets and I can't launch."
 
@@ -286,6 +329,38 @@ If you are on a personal account, in order of preference:
 | Splash screen, app icon, app name, permissions, Play Billing config, target SDK | Rebuild the `.aab` → upload to Play | ✅ **Yes** | Hours (Play review) |
 
 So ~95% of what you'll ever change needs **no Play release at all**. That is the big advantage of the TWA approach and it means you are not blocked by review turnaround for product iteration.
+
+### How the automatic deploy actually works
+
+There are four separate things and they chain together. Nobody clicks anything in Netlify.
+
+```
+1. I edit files on your PC          (C:\Users\lahog\ClaudeCode\SmartSpeak)
+        ↓  git commit + git push
+2. GitHub                            (github.com/TomLaho/SmartSpeak, branch: main)
+        ↓  webhook — GitHub tells Netlify "main changed"
+3. Netlify                           builds the site, publishes it (~2 min)
+        ↓
+4. smartspeak-app.netlify.app        now serving the new version
+        ↓
+5. Your Android app                  loads that URL — so it's updated too
+```
+
+**Netlify is watching your GitHub repo.** When you connected the site, Netlify installed a webhook on the repo. Every push to `main` fires it, Netlify pulls the code, runs `npm run build`, and publishes the result. That's why your dashboard showed a deploy 30 minutes ago — that was my `git push`, nothing more. You never need to open Netlify.
+
+**On your free-tier concern — you're not spending "credits" per update.** Netlify's free tier limits are:
+
+| Limit | Free tier | What SmartSpeak uses |
+|---|---|---|
+| Build minutes | 300 / month | ~1–2 min per deploy → ~150+ deploys/month available |
+| Bandwidth | 100 GB / month | Tiny — it's a small static site |
+| Sites / deploys | Unlimited | — |
+
+The one to watch is **build minutes**, not deploy count. At ~1–2 minutes a build you'd need well over a hundred deploys in a month to run out, and I batch changes into single pushes rather than pushing per edit. Realistically you will not come close.
+
+☐ If you want to keep an eye on it: Netlify → your team → **Billing** → **Usage**. It resets monthly.
+
+> One genuine cost to know about: a failed build still consumes build minutes. That's another reason I run `npm run build` locally before pushing — a broken push would burn minutes and leave the live site stale.
 
 ### ☐ Route A — web change (the common case)
 

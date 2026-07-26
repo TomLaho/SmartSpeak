@@ -20,12 +20,16 @@ SmartSpeak — speech-training PWA (Next.js, static export) deployed to Netlify 
 
 | Item | Value |
 |---|---|
-| Good `.aab` | `C:\Users\lahog\ClaudeCode\smartspeak-twa\app\build\outputs\bundle\release\app-release.aab` (3.3 MB) |
-| **Stale/broken `.aab` — never upload** | `C:\Users\lahog\ClaudeCode\SmartSpeak\Google Play package\SmartSpeak.aab` |
-| Keystore | `C:\Users\lahog\ClaudeCode\smartspeak-twa\smartspeak-upload.keystore` |
+| TWA wrapper project | `SmartSpeak\android\` — **moved** from `ClaudeCode\smartspeak-twa\` on 26/07; git-ignored wholesale via `/android/` in `.gitignore` |
+| Good `.aab` | `SmartSpeak\android\app\build\outputs\bundle\release\app-release.aab` |
+| Keystore | `SmartSpeak\android\smartspeak-upload.keystore` (also backed up to Tom's Google Drive) |
 | Alias / password | `smartspeak` / `SmartSpeak2024!` (store + key) |
 | Upload key SHA-256 | `58:5F:7C:A8:ED:AC:8F:36:C4:C0:1E:BF:58:1F:32:2F:73:25:8A:20:CF:50:D5:B6:58:ED:23:CD:15:2B:56:98` |
+| Play App-signing SHA-256 | `A9:9C:E7:CF:51:D6:3E:82:D9:92:B8:A5:E7:30:DA:9E:D5:1D:53:B5:5B:76:39:9A:12:3B:2B:68:C7:16:3C:1E` |
 | Store assets | `SmartSpeak\store-assets\` (feature graphic + 4 screenshots) |
+| Defunct PWABuilder key | `ClaudeCode\SmartSpeak - Keystore\` — never used for any upload; superseded. Safe to archive or delete. |
+
+> The old broken PWABuilder `.aab` (`SmartSpeak\Google Play package\`) has been deleted by Tom.
 
 ## Second round of fixes — same day, after device testing
 
@@ -50,9 +54,9 @@ Checked directly against the extracted `base/manifest/AndroidManifest.xml` and v
 
 ### Build gotchas worth knowing next time
 
-- **Do not run `bubblewrap build` when `twa-manifest.json` has changed** — it prompts to regenerate the project, which **overwrites the custom `splash.png` assets** from `iconUrl`. Build with `.\gradlew.bat bundleRelease --no-daemon` instead and bump `versionCode`/`versionName` directly in `app/build.gradle` (keeping `twa-manifest.json` in sync manually).
+- **Do not run `bubblewrap build` when `twa-manifest.json` has changed** — it prompts to regenerate the project, which **overwrites the custom `splash.png` assets** from `iconUrl`. Build with `.\gradlew.bat bundleRelease --no-daemon` from `SmartSpeak\android\` instead, and bump `versionCode`/`versionName` directly in `app/build.gradle` (keeping `twa-manifest.json` in sync manually).
 - `local.properties` with `sdk.dir=C:\Users\lahog\AppData\Local\Android\Sdk` is required for direct Gradle builds; Bubblewrap injects it itself.
-- The keystore password sits in cleartext in `app/build.gradle` (`signingConfigs.release`). Fine while `smartspeak-twa/` is not a git repo — **do not `git init` that directory** without stripping it first.
+- The keystore password sits in cleartext in `android/app/build.gradle` (`signingConfigs.release`). This is why `/android/` is git-ignored in full rather than selectively — verified with `git check-ignore`. **Never `git add -f` anything under `android/`.**
 
 ## No open technical tasks
 
