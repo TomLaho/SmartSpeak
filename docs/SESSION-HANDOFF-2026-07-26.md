@@ -27,9 +27,36 @@ SmartSpeak — speech-training PWA (Next.js, static export) deployed to Netlify 
 | Upload key SHA-256 | `58:5F:7C:A8:ED:AC:8F:36:C4:C0:1E:BF:58:1F:32:2F:73:25:8A:20:CF:50:D5:B6:58:ED:23:CD:15:2B:56:98` |
 | Store assets | `SmartSpeak\store-assets\` (feature graphic + 4 screenshots) |
 
-## The one open technical task
+## Second round of fixes — same day, after device testing
 
-**Add Google's App-signing SHA-256 as a *second* fingerprint in `assetlinks.json`.** Play re-signs the delivered app with Google's own key, so the upload-key fingerprint alone is not enough — testers installing from Play will see the URL bar until this is added. Tom gets that fingerprint from Play Console → Test and release → Setup → App integrity → App signing → *App signing key certificate* → SHA-256, and hands it over. Append it to the existing `sha256_cert_fingerprints` array (keep the upload key entry — sideloaded builds need it), commit, push; Netlify redeploys. Tom must then uninstall + reinstall to clear the cached verification.
+Tom tested the installed build and reported 7 issues. All fixed, built, verified and pushed (commit `2407158` plus docs):
+
+| # | Issue | Root cause | Fix |
+|---|---|---|---|
+| 1 | Onboarding sheet's CTA clipped off-screen | `app/train/layout.tsx` set `z-10` on the content wrapper, creating a stacking context that trapped the `z-50` modal *below* the `z-30` tab bar | Removed the `z-10`; also constrained the sheet to `max-h-[92dvh]` with scroll + safe-area padding |
+| 2 | First tap dropped straight into an exercise | Onboarding CTA called `router.push` to the recommended rep | Button now only dismisses; copy points at the modules. Removed the now-orphaned `startFirstRep` + `useRouter` |
+| 3 | "Try again" / "Re-score" invisible (dark-on-dark) | `variant="secondary"` carries `text-secondary-foreground` = `222.2 47.4% 11.2%` (near-black); the `className` override only replaced the background | Added explicit `text-white` + border. Same latent bug fixed in `profile/page.tsx` Cancel |
+| 4 | Module stuck on "In progress"; "Next up" hidden behind "Keep going to reveal it" | `moduleProgress.pct` was mastery-only (bestScore ≥ 70), so a completed-but-low-scoring rep moved nothing | Split completion from mastery in `lib/selection.ts` (`completedCount`/`completedPct` + `moduleStatusLabel`); rewrote the module view as a Duolingo-style path showing **every** rep with done/mastered/current/upcoming/locked states and lit connectors |
+| 5 | Overall score 46 while every visible metric was 80+ | `overallScore` averaged only the exercise's *focus* dimensions, which were the low ones | Straight unweighted average of all measured dimensions shown on screen |
+| 6 | Google App-signing key not trusted | — | Added `A9:9C:E7:…:1E` as a second fingerprint in `assetlinks.json` (upload key retained for sideloading) |
+| 7 | Splash was a hard-edged grey square on black | Bubblewrap generated `splash.png` by upscaling `icon-512.png`, whose dark-grey tile doesn't match the `#0C0B10` splash background | Generated new splash assets at all 5 densities: squircle-clipped mark on transparent + wordmark + tagline. Bundle also shrank 3.3 MB → 2.36 MB (old splash set was 2.03 MB of upscaled gradient; new is 578 KB) |
+
+### New bundle — verified independently, not self-reported
+
+`app-release.aab`, versionCode **3**, versionName **1.0.1**, also copied to `C:\Users\lahog\Desktop\smartspeak-v3-app-release.aab`.
+
+Checked directly against the extracted `base/manifest/AndroidManifest.xml` and via `jarsigner`/`keytool`:
+`RECORD_AUDIO` ✅ · `INTERNET` ✅ · `com.android.vending.BILLING` ✅ · package `app.smartspeak.twa` ✅ · versionCode `3` ✅ · signed by the upload key `58:5F:7C…98` ✅ (matches assetlinks entry 1) · new splash present at all 5 densities ✅
+
+### Build gotchas worth knowing next time
+
+- **Do not run `bubblewrap build` when `twa-manifest.json` has changed** — it prompts to regenerate the project, which **overwrites the custom `splash.png` assets** from `iconUrl`. Build with `.\gradlew.bat bundleRelease --no-daemon` instead and bump `versionCode`/`versionName` directly in `app/build.gradle` (keeping `twa-manifest.json` in sync manually).
+- `local.properties` with `sdk.dir=C:\Users\lahog\AppData\Local\Android\Sdk` is required for direct Gradle builds; Bubblewrap injects it itself.
+- The keystore password sits in cleartext in `app/build.gradle` (`signingConfigs.release`). Fine while `smartspeak-twa/` is not a git repo — **do not `git init` that directory** without stripping it first.
+
+## No open technical tasks
+
+Everything on the code, web and build side is done and verified. What remains is entirely Tom's manual Play Console work.
 
 ## Everything else is Tom's manual Play Console work
 
@@ -41,5 +68,7 @@ Closed testing: **12 testers opted in for 14 continuous days** before production
 
 ## Not yet verified
 
-- Whether the mic prompt + transcription actually work on the installed Android build (needs a real device test — playbook Step 6).
-- Play developer account type (personal vs organisation) — determines whether production today is even possible.
+- **Play developer account type (personal vs organisation)** — determines whether the 12-tester/14-day closed test is required at all. Highest-leverage unknown; check before advising on timelines.
+- The seven fixes above are verified by build, lint and bundle inspection, **not** by a real device test. Tom needs to reinstall and confirm on-device.
+
+Microphone + transcription are confirmed working on the installed Android build (Tom tested it).

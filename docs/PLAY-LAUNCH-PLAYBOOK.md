@@ -14,7 +14,7 @@ Follow top to bottom. One action per step. Don't skip, don't reorder.
 | Web app (PWA) at smartspeak-app.netlify.app | ✅ Live, deployed, verified |
 | Android App Bundle (`.aab`) | ✅ Built + verified (mic permission, billing, correct package) |
 | Upload signing key | ✅ Created — **you must back it up (Step 1)** |
-| Digital asset links (kills the URL bar) | ⚠️ Half done — needs Google's key after upload (Step 8) |
+| Digital asset links (kills the URL bar) | ✅ Done — both upload key and Google's App-signing key are live |
 | Privacy policy URL in Play Console | ❌ Not done (Step 5) |
 | `pro_unlock` in-app product | ❌ Not done (Step 10) |
 | Closed test (12 testers / 14 days) | ❌ Not started (Step 11) — **this is the long pole** |
@@ -34,8 +34,9 @@ Check which account type you have: Play Console → **Settings** (gear, bottom-l
 
 | File | Use it? |
 |---|---|
-| `C:\Users\lahog\ClaudeCode\smartspeak-twa\app\build\outputs\bundle\release\app-release.aab` | ✅ **THIS ONE.** The good build. |
-| `C:\Users\lahog\ClaudeCode\SmartSpeak\Google Play package\SmartSpeak.aab` | ❌ **NEVER.** Old broken build — microphone doesn't work. |
+| `C:\Users\lahog\Desktop\smartspeak-v3-app-release.aab` | ✅ **THIS ONE.** Version code 3 — verified mic + billing + new splash. Already on your Desktop. |
+| `C:\Users\lahog\ClaudeCode\smartspeak-twa\app\build\outputs\bundle\release\app-release.aab` | ✅ Same file, at its build location. |
+| `C:\Users\lahog\ClaudeCode\SmartSpeak\Google Play package\SmartSpeak.aab` | ❌ **NEVER.** Old broken build — microphone doesn't work. Safe to delete the whole folder. |
 
 ---
 
@@ -59,14 +60,10 @@ This file is your app's identity. Lose it and you can never update SmartSpeak ag
 
 > The old PWABuilder key is dead. Nothing was ever uploaded with it, so it doesn't matter. Ignore it.
 
-### ☐ Step 2 — Copy the .aab somewhere easy to find (1 min)
+### ☐ Step 2 — Find the .aab (already done for you)
 
-1. In File Explorer, paste this into the address bar:
-   ```
-   C:\Users\lahog\ClaudeCode\smartspeak-twa\app\build\outputs\bundle\release
-   ```
-2. Copy **`app-release.aab`** to your **Desktop**.
-3. ✅ **Done when:** `app-release.aab` (about 3.3 MB) is sitting on your Desktop.
+1. Look on your **Desktop** for **`smartspeak-v3-app-release.aab`** (2.4 MB).
+2. ✅ **Done when:** you can see that file. It's already there — nothing to copy.
 
 ---
 
@@ -80,7 +77,7 @@ Open https://play.google.com/console in Chrome and sign in. Select the **SmartSp
 
 1. Left sidebar → **Test and release** → **Testing** → **Internal testing**.
 2. Top-right → blue **Create new release** button.
-3. You'll see a box labelled **App bundles**. Drag `app-release.aab` from your Desktop into it. Wait for the upload bar to finish (~30 seconds).
+3. You'll see a box labelled **App bundles**. Drag `smartspeak-v3-app-release.aab` from your Desktop into it. Wait for the upload bar to finish (~30 seconds).
 4. If a dialog appears offering **Play App Signing** / "Use Google-generated key" → click **Continue** / **Accept**. This is correct and required.
 5. Scroll down to **Release notes**. In the box, paste:
    ```
@@ -137,13 +134,20 @@ Do this on your phone, on the build you just installed from Play.
 
 1. Look at the very top of the app screen.
 2. ✅ **PASS =** no address bar. It looks like a real app, edge to edge.
-3. ⚠️ **Expected FAIL right now =** a thin bar showing `smartspeak-app.netlify.app`. **This is normal at this stage** — Step 8 fixes it. Don't panic.
+3. ⚠️ If you still see a thin bar showing `smartspeak-app.netlify.app`: **uninstall the app, then reinstall it** from the Play link. Android caches a failed verification, so a fresh install is needed to pick up the fingerprints that are already live. It should be gone after that.
 
 ---
 
 ## PART 4 — Kill the URL bar for real
 
-### ☐ Step 8 — Send Claude the Google signing fingerprint (5 min)
+### ✅ Step 8 — Google signing fingerprint — ALREADY DONE
+
+You sent the App-signing SHA-256 (`A9:9C:E7:…:1E`) and it is now live in `assetlinks.json` alongside the upload key. **Nothing to do here.**
+
+All you need to do is **uninstall and reinstall** SmartSpeak once after your next install, so the phone re-runs the verification instead of using its cached "failed" result. Then the URL bar should be gone.
+
+<details>
+<summary>Why this was needed (for reference)</summary>
 
 Google re-signs your app with *its own* key when it delivers it from the Play Store. So the website needs to trust that key too, not just yours.
 
@@ -161,6 +165,8 @@ Google re-signs your app with *its own* key when it delivers it from the Play St
 8. ✅ **Done when:** you reopen the app and the URL bar is gone.
 
 > **Copy the SHA-256, not the SHA-1.** They're right next to each other on that page. SHA-**256** is the long one.
+
+</details>
 
 ---
 
@@ -183,9 +189,21 @@ Skip any field marked optional. Speed over polish — you can edit all of this l
 5. Then work through every remaining item in **App content** (left sidebar → Policy → App content) that still shows an incomplete/red status: Data safety, Ads declaration, Content rating questionnaire, Target audience, Government apps. Answer honestly; each is a short form.
 6. ✅ **Done when:** every row in **App content** shows a green tick.
 
+> **Feedback email — `info@kairoanalytics.com` is a fine choice.** A monitored role address beats a personal one, and it's the right *kind* of address for the field. Two things to be aware of:
+> - It is **public** on your store listing, so it will attract spam. Make sure it's filtered, not forwarded raw to your main inbox.
+> - It publicly links SmartSpeak to Kairo Analytics. If you'd rather keep the app and the consulting brand separate — different audiences, different positioning — set up `hello@smartspeak.app` or similar instead. Purely a branding call; there's no technical difference. You can change it any time.
+
 > **Data safety hint:** SmartSpeak records audio. Declare that you collect audio, state whether it leaves the device, and that it's used for app functionality. Be accurate — a false declaration here gets apps pulled.
 
 ### ☐ Step 10 — Create the `pro_unlock` product (10 min)
+
+> **If you see "Finish setting up your app on the dashboard"** — that's expected, not a bug. Play locks the Monetise section behind two prerequisites. Clear them in this order, then come back:
+>
+> **10a.** ☐ Left sidebar → **Dashboard** → the **Set up your app** panel. Work down that checklist until every item has a green tick (it's the same set as Step 9: store listing, content rating, data safety, target audience, ads, privacy policy).
+>
+> **10b.** ☐ Left sidebar → **Monetise** → **Monetisation setup** → **Payments profile**. If it says no profile is linked, click **Create payments profile** and complete it. You need an Australian business/personal payments profile (name, address, and for a business, your ABN). **This is the step most people are actually blocked by** — you cannot sell anything until it exists, and it can take a day or two to verify.
+>
+> **Do not let this block Step 11.** The closed test does not need `pro_unlock` to exist. Start the 14-day clock first, sort monetisation during those two weeks.
 
 1. Left sidebar → **Monetise** → **Products** → **In-app products**.
 2. Top-right → **Create product**.
@@ -211,10 +229,36 @@ Skip any field marked optional. Speed over polish — you can edit all of this l
 2. Click **Create track** (name it `Closed test`) → then **Create new release**.
 3. Under **App bundles**, click **Add from library** → select the same build you uploaded in Step 3. (Don't re-upload the file.)
 4. Add release notes → **Next** → **Save and publish**.
-5. **Testers** tab → **Create email list** → name it `Closed testers` → add **12+ Google account email addresses** (use 14–15 for safety margin in case someone drops out).
+5. **Testers** tab → **Create email list** → name it `Closed testers` → add **12+ Google account email addresses** (use 14–15 for safety margin in case someone drops out). See **Step 11b** if you don't have 12 people.
 6. **Save changes**, tick the list, **Save changes**.
-7. Copy the opt-in link and send it to all 12 people.
+7. Copy the opt-in link and send it to all 12 people. It looks like this:
+   ```
+   https://play.google.com/apps/testing/app.smartspeak.twa
+   ```
 8. ✅ **Done when:** 12 people have opened the link and tapped **Become a tester**.
+
+> **Which link is which** — you asked about both:
+> | Link | What it is |
+> |---|---|
+> | `play.google.com/apps/testing/app.smartspeak.twa` | ✅ **The tester opt-in page.** This is the one you share. Works during closed testing. |
+> | `play.google.com/store/apps/details?id=app.smartspeak.twa` | The public store page. Returns "not found" until you're live in production. Don't share it yet. |
+
+### ☐ Step 11b — You don't have 12 Android-owning friends. Here's what to do.
+
+**Check this first, it may make the whole problem disappear:** Settings → Developer account → Account details → **Account type**. If it says *Organisation*, the 12-tester/14-day rule does not apply to you at all — skip straight to production (Step 12). Only *Personal* accounts are subject to it. Check before you spend effort recruiting.
+
+If you are on a personal account, in order of preference:
+
+1. **☐ Reciprocal testing communities — the normal, accepted route.** Thousands of solo devs are in exactly your position, so a whole ecosystem exists where developers test each other's apps. You join, you install and open 11 other people's apps for 14 days, they do the same for yours. Free, legitimate, and Google is fine with it.
+   - `r/AndroidClosedTesting` and `r/TestMyApp` on Reddit
+   - Search "Google Play closed testing group" on Telegram or Discord — several large, active ones
+   - Post your opt-in link, commit to testing theirs, be responsive
+2. **☐ Widen your own net beyond close friends.** You need 12 Google accounts, not 12 best mates. Colleagues, gym contacts, extended family, LinkedIn network, your Kairo clients. A one-line ask — "install this, open it a couple of times over two weeks, don't uninstall" — is a low bar and most people say yes.
+3. **⚠️ Paid tester services — I'd avoid these.** They exist ($50–150 for 12 testers) and they work often enough that people use them, but Google has been actively cracking down on fake or low-engagement testers. The downside risk is your production application getting rejected or the developer account flagged, which costs you far more than two weeks. Not worth it when option 1 is free.
+
+**What will not work:** switching to **open testing** instead. Open testing does not satisfy the requirement — Google specifically requires a *closed* test. Don't waste a week finding that out.
+
+**Testers must actually engage.** Google looks at whether testers genuinely used the app, not just that 12 accounts opted in. Ask people to open it a few times across the two weeks, not once on day one.
 
 **Tell your testers, word for word:**
 > "Tap this link, tap Become a tester, install SmartSpeak, and open it a few times over the next two weeks. **Do not uninstall it and do not leave the tester program** — if you drop out, the 14-day counter resets and I can't launch."
@@ -226,6 +270,45 @@ Skip any field marked optional. Speed over polish — you can edit all of this l
 1. Left sidebar → **Test and release** → **Production** → **Create new release**.
 2. Add the build from library, add release notes, submit for review.
 3. Review takes anywhere from a few hours to 7 days for a first submission.
+
+---
+
+---
+
+## PART 7 — How to ship changes after launch
+
+**The single most useful thing to understand about this app:** SmartSpeak is a **TWA** — the Android app is a thin native shell around the live website at `smartspeak-app.netlify.app`. That splits every future change into two very different categories.
+
+| Change type | How it ships | Play upload needed? | Time to reach testers |
+|---|---|---|---|
+| Anything in the web app — screens, layout, colours, copy, scoring logic, bug fixes, new exercises | `git push` → Netlify auto-deploys | ❌ **No** | ~2 min |
+| `assetlinks.json` (signing fingerprints) | `git push` → Netlify | ❌ **No** | ~2 min |
+| Splash screen, app icon, app name, permissions, Play Billing config, target SDK | Rebuild the `.aab` → upload to Play | ✅ **Yes** | Hours (Play review) |
+
+So ~95% of what you'll ever change needs **no Play release at all**. That is the big advantage of the TWA approach and it means you are not blocked by review turnaround for product iteration.
+
+### ☐ Route A — web change (the common case)
+
+1. I push to `main`.
+2. Netlify builds and deploys automatically (~2 minutes).
+3. ☐ On your phone: **fully close SmartSpeak** (swipe it out of the recent-apps list — don't just press back), then reopen it.
+4. ✅ **Done when:** you see the change. The service worker serves pages network-first, so one clean reopen is enough. If it's stubborn, open it twice.
+5. Testers get it the same way — no action needed from them beyond reopening the app.
+
+> You do **not** need to tell testers to update, and it does **not** interrupt the 14-day closed-test clock.
+
+### ☐ Route B — native change (rebuild required)
+
+1. I rebuild the `.aab` with an incremented version code and send it to you.
+2. ☐ Play Console → **Test and release** → **Testing** → **Internal testing** (or **Closed testing**) → **Create new release**.
+3. ☐ Drag the new `.aab` into **App bundles**.
+4. ☐ Release notes → **Next** → **Save and publish**.
+5. ☐ On your phone: Play Store → your app → **Update** (or wait — it auto-updates within a day).
+6. ✅ **Done when:** the new version code shows in the release list and your phone's install matches it.
+
+> **Version code must always increase.** Play rejects a bundle whose version code has been used before. I handle this — just never upload an old `.aab` on top of a newer one.
+
+> **Rolling out a new `.aab` does not reset the 14-day clock**, as long as testers stay opted in. Updating is safe.
 
 ---
 
@@ -246,10 +329,10 @@ Everything else — descriptions, screenshots, price, icon — you can edit any 
 
 If you only do five things today, do these in this order:
 
-1. **Step 1** — back up the key (5 min, irreversible if skipped)
-2. **Step 3** — upload the .aab
-3. **Step 5** — privacy URL
-4. **Step 8** — send Claude the signing SHA-256
-5. **Step 11** — start the closed test with 12 testers ← *starts the 14-day clock*
+1. **Step 1** — back up the keystore (5 min, unrecoverable if skipped)
+2. **Check your account type** (PART 0) — if it's an *Organisation* account, steps 11/11b vanish and you can go to production today
+3. **Step 3** — upload `smartspeak-v3-app-release.aab` to Internal testing
+4. **Step 5** — privacy URL
+5. **Step 11 / 11b** — start the closed test and recruit 12 testers ← *starts the 14-day clock*
 
-Everything else can happen during the 14 days.
+Everything else — store listing polish, `pro_unlock`, payments profile — can happen during the 14 days. Don't let Step 10 block Step 11.
