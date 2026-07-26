@@ -33,10 +33,20 @@ export type Dimension =
   | 'intonation'
   | 'energy'
   | 'fillers'
+  | 'accuracy'
   | 'hook'
   | 'structure'
   | 'clarity'
   | 'concreteness';
+
+/** Dimensions measured from the audio signal — valid for every exercise type. */
+export const DELIVERY_DIMENSIONS: Dimension[] = ['pace', 'pauses', 'intonation', 'energy', 'fillers'];
+
+/**
+ * Dimensions measured from the words spoken. Only meaningful when the words are
+ * the presenter's own — see `scorableDimensions`.
+ */
+export const CONTENT_DIMENSIONS: Dimension[] = ['hook', 'structure', 'clarity', 'concreteness'];
 
 export interface Track {
   id: TrackId;
@@ -904,11 +914,71 @@ export const DIMENSION_LABELS: Record<Dimension, string> = {
   intonation: 'Intonation',
   energy: 'Energy',
   fillers: 'Filler words',
+  accuracy: 'Script accuracy',
   hook: 'Opening',
   structure: 'Structure',
   clarity: 'Clarity',
   concreteness: 'Specifics',
 };
+
+// ─────────────────────── Scoring scope & timing ───────────────────────
+
+/**
+ * Which dimensions it is legitimate to score for a given exercise.
+ *
+ * The rule: only score what the presenter actually controls. On a `read` rep
+ * the passage is ours, so Opening / Structure / Clarity / Specifics grade *our
+ * copywriting* — every presenter would get an identical score no matter how
+ * well they performed, which is noise dressed up as feedback. What a read rep
+ * can honestly measure is delivery plus how faithfully the script was read.
+ *
+ * On `topic` / `story` reps the words are the presenter's own, so the content
+ * dimensions are fair game and `accuracy` is meaningless (there is no script).
+ */
+export function scorableDimensions(exercise: Exercise): Dimension[] {
+  if (exercise.type === 'read' && exercise.readingText) {
+    return [...DELIVERY_DIMENSIONS, 'accuracy'];
+  }
+  return [...DELIVERY_DIMENSIONS, ...CONTENT_DIMENSIONS];
+}
+
+/** Words per minute a confident presenter reads at — used to derive timings. */
+export const TARGET_READING_WPM = 140;
+
+/**
+ * Strips bracketed stage directions such as "[pause]" from a passage.
+ *
+ * They're delivery cues for the reader's eye, not words to say — so they must
+ * not inflate the word count, the derived timing, or the script-accuracy match.
+ */
+export function spokenText(text: string): string {
+  return text.replace(/\[[^\]]*\]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+export function countWords(text: string): number {
+  return spokenText(text).split(/\s+/).filter(Boolean).length;
+}
+
+/**
+ * How long this rep should actually take, in seconds.
+ *
+ * For `read` reps this is *derived from the passage* rather than trusted from
+ * `targetSeconds`: hand-set targets drift away from the text as copy is edited,
+ * which is how a ~78-word passage ended up advertised as a 60-second rep when
+ * it reads in about 33. Deriving it means the number is right every time and
+ * cannot go stale.
+ *
+ * For `topic` / `story` reps there is no script to measure, so the authored
+ * `targetSeconds` stands — it is a genuine target, not a prediction.
+ */
+export function expectedSeconds(exercise: Exercise): number {
+  if (exercise.type === 'read' && exercise.readingText) {
+    const seconds = (countWords(exercise.readingText) / TARGET_READING_WPM) * 60;
+    // Round to the nearest 5s so the UI shows a friendly number, floor at 15s.
+    return Math.max(15, Math.round(seconds / 5) * 5);
+  }
+  return exercise.targetSeconds;
+}
 
 /** Daily XP target for the "one rep a day" habit loop. */
 export const DAILY_GOAL_XP = 30;
@@ -928,26 +998,32 @@ export const BENCHMARKS: Record<Dimension, Benchmark> = {
   pace: {
     dimension: 'pace',
     label: 'Pace',
-    target: '130–160 wpm',
+    target: '125–165 wpm',
     rationale: 'Slow enough that each point lands before the next one arrives.',
   },
   pauses: {
     dimension: 'pauses',
     label: 'Pauses',
-    target: '6–12 pauses/min',
+    target: '8–22 pauses/min',
     rationale: 'Silence makes key points feel deliberate rather than accidental.',
   },
   intonation: {
     dimension: 'intonation',
     label: 'Intonation',
-    target: '2.5–6 semitones of pitch movement',
+    target: '2.5–7 semitones of pitch movement',
     rationale: 'Variation carries meaning; monotone reads as nerves.',
   },
   energy: {
     dimension: 'energy',
     label: 'Energy',
-    target: '8+ dB dynamic range',
+    target: '8–20 dB dynamic range',
     rationale: 'Varying loudness holds attention and signals what matters.',
+  },
+  accuracy: {
+    dimension: 'accuracy',
+    label: 'Script accuracy',
+    target: '90%+ of the passage read',
+    rationale: 'On a scripted rep, reading it faithfully is the part you control.',
   },
   fillers: {
     dimension: 'fillers',

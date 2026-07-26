@@ -1,7 +1,13 @@
 'use client';
 
 import type { AudioMetrics } from './audio-analysis';
-import { DIMENSION_LABELS, type Dimension, type Exercise } from './exercises';
+import {
+  DIMENSION_LABELS,
+  scorableDimensions,
+  spokenText,
+  type Dimension,
+  type Exercise,
+} from './exercises';
 
 /**
  * Deterministic, on-device coaching.
@@ -81,24 +87,50 @@ function bell(value: number, ideal: number, span: number): number {
   return clamp(score);
 }
 
+/**
+ * Plateau score: 100 anywhere inside [lo, hi], decaying to 0 at lo-span / hi+span.
+ *
+ * Most delivery metrics have a *range* that reads as good, not a single ideal
+ * value. A triangular curve around one point quietly punishes perfectly good
+ * speech for missing an arbitrary target — 150 wpm is not worse than 145 wpm.
+ */
+function plateau(value: number, lo: number, hi: number, span: number): number {
+  if (value >= lo && value <= hi) return 100;
+  const distance = value < lo ? lo - value : value - hi;
+  return clamp(100 - (distance / span) * 100);
+}
+
 function clamp(n: number, lo = 0, hi = 100): number {
   return Math.max(lo, Math.min(hi, Math.round(n)));
 }
 
 // ─────────────────────────── Delivery scorers ───────────────────────────
 
+/**
+ * The words-per-minute figure the coach scores on, and the one the UI must
+ * display.
+ *
+ * Prefers the transcript-independent syllable-rate estimate: it's bounded by
+ * the audio and immune to speech-to-text over-counting, which can report absurd
+ * word rates on short clips. `articulationWpm` divides words by *speaking* time
+ * only — a real phonetics measure, but it runs far higher than speech rate, so
+ * showing it under a "Pace / wpm" label made the tile disagree with the score
+ * beside it (a normal read displayed as 338 wpm).
+ */
+export function paceWpm(audio: AudioMetrics): number | undefined {
+  return audio.estimatedWpm ?? audio.wpm ?? audio.articulationWpm;
+}
+
 function scorePace(audio: AudioMetrics): DimensionScore {
-  // Prefer the transcript-independent syllable-rate estimate: it's bounded by the
-  // audio and immune to speech-to-text over-counting (which can report absurd
-  // word rates on short clips). Fall back to word-based pace only if needed.
-  const wpm = audio.estimatedWpm ?? audio.articulationWpm ?? audio.wpm;
+  const wpm = paceWpm(audio);
   if (!wpm) {
     return dim('pace', 70, 'Speak a little longer so we can measure your pace from the audio.', false);
   }
-  const score = bell(wpm, 145, 75);
+  // 125–165 wpm is the whole comfortable presenting band, not a single target.
+  const score = plateau(wpm, 125, 165, 45);
   let detail: string;
-  if (wpm < 110) detail = `~${wpm} wpm — a touch slow. A little more momentum keeps the energy up.`;
-  else if (wpm > 185) detail = `~${wpm} wpm — quite fast. Slow down ~10% so each point can land.`;
+  if (wpm < 125) detail = `~${wpm} wpm — a touch slow. A little more momentum keeps the energy up.`;
+  else if (wpm > 165) detail = `~${wpm} wpm — quite fast. Slow down ~10% so each point can land.`;
   else detail = `~${wpm} wpm — right in the confident, easy-to-follow zone.`;
   return dim('pace', score, detail, true);
 }
@@ -106,10 +138,14 @@ function scorePace(audio: AudioMetrics): DimensionScore {
 function scorePauses(audio: AudioMetrics): DimensionScore {
   if (audio.unavailable) return dim('pauses', 70, 'Pause analysis needs the audio recording.', false);
   const ppm = audio.pausesPerMin;
-  const score = bell(ppm, 10, 12);
+  // A "pause" here is any silence over 0.35s — i.e. ordinary clause-level
+  // phrasing, not just dramatic ones. Well-phrased speech runs 8–22 of them a
+  // minute, so that whole band is full marks; the old single 10/min ideal
+  // scored normal, well-paced delivery as a failure.
+  const score = plateau(ppm, 8, 22, 14);
   let detail: string;
-  if (ppm < 3) detail = `Only ${audio.pauseCount} clear pause(s). Build in silence before key points.`;
-  else if (ppm > 20) detail = `Lots of pausing (${ppm}/min). Some hesitation — try shorter, more deliberate breaks.`;
+  if (ppm < 8) detail = `Only ${audio.pauseCount} clear pause(s). Build in silence before key points.`;
+  else if (ppm > 22) detail = `Lots of pausing (${ppm}/min). Some hesitation — try shorter, more deliberate breaks.`;
   else detail = `${audio.pauseCount} well-placed pauses. Nice use of silence to shape your delivery.`;
   if (audio.longPauseCount >= 3) detail += ` (${audio.longPauseCount} long gaps — keep them intentional.)`;
   return dim('pauses', score, detail, true);
@@ -120,11 +156,11 @@ function scoreIntonation(audio: AudioMetrics): DimensionScore {
     return dim('intonation', 65, "Couldn't track pitch clearly — record somewhere quiet for this one.", false);
   }
   const v = audio.pitch.variationSemitones;
-  // Monotone ≈ <1.5 st; expressive ≈ 2.5-6 st.
-  const score = v < 1.5 ? clamp(v / 1.5 * 55) : clamp(55 + bell(v, 4, 4) * 0.45);
+  // Monotone ≈ <2 st; natural expressive presenting ≈ 2.5–7 st; >9 is theatrical.
+  const score = plateau(v, 2.5, 7, 3);
   let detail: string;
-  if (v < 1.5) detail = `Fairly monotone (${v} semitones of pitch movement). Let your voice rise and fall more.`;
-  else if (v > 8) detail = `Very animated pitch (${v} semitones). Great energy — just keep it controlled.`;
+  if (v < 2.5) detail = `Fairly monotone (${v} semitones of pitch movement). Let your voice rise and fall more.`;
+  else if (v > 7) detail = `Very animated pitch (${v} semitones). Great energy — just keep it controlled.`;
   else detail = `Lively intonation (${v} semitones of variation). Your voice carries the meaning well.`;
   return dim('intonation', score, detail, true);
 }
@@ -132,9 +168,10 @@ function scoreIntonation(audio: AudioMetrics): DimensionScore {
 function scoreEnergy(audio: AudioMetrics): DimensionScore {
   if (audio.unavailable) return dim('energy', 70, 'Volume dynamics need the audio recording.', false);
   const range = audio.energy.dynamicRangeDb;
-  const score = range < 5 ? clamp((range / 5) * 55) : clamp(55 + bell(range, 13, 12) * 0.45);
+  // 8–20 dB of movement is the expressive-but-controlled band.
+  const score = plateau(range, 8, 20, 10);
   let detail =
-    range < 5
+    range < 8
       ? `Flat volume (${range} dB range). Push key words louder and pull back elsewhere.`
       : `Good vocal dynamics (${range} dB range) — you vary loudness to keep attention.`;
   // Relative to the user's calibrated speaking level, when available.
@@ -146,10 +183,20 @@ function scoreEnergy(audio: AudioMetrics): DimensionScore {
   return dim('energy', score, detail, true);
 }
 
-function scoreFillers(text: string, words: number, audio: AudioMetrics): DimensionScore {
+function scoreFillers(
+  text: string,
+  words: number,
+  audio: AudioMetrics,
+  scripted: boolean
+): DimensionScore {
   // Acoustic "uh/um" hesitations come straight from the audio; lexical fillers
   // ("like", "you know", …) come from the transcript when we have one.
-  const lexical = words >= 5 ? countOccurrences(' ' + text.toLowerCase() + ' ', LEXICAL_FILLERS) : 0;
+  //
+  // On a scripted rep the transcript is *our* passage, so counting lexical
+  // fillers would dock the presenter for words we wrote. Only the acoustic
+  // hesitations are genuinely theirs.
+  const lexical =
+    !scripted && words >= 5 ? countOccurrences(' ' + text.toLowerCase() + ' ', LEXICAL_FILLERS) : 0;
   const acoustic = audio.unavailable ? 0 : audio.filledPauseCount;
   const total = lexical + acoustic;
 
@@ -174,6 +221,60 @@ function scoreFillers(text: string, words: number, audio: AudioMetrics): Dimensi
     detail = `${parts.join(' and ')} (~${perMin.toFixed(1)}/min). Replace each one with a silent breath.`;
   }
   return dim('fillers', score, detail, true);
+}
+
+/**
+ * How faithfully the passage was read.
+ *
+ * This is the one content dimension a scripted rep can honestly measure, and it
+ * replaces the four that only graded our own copy. Uses a bag-of-words overlap
+ * rather than strict sequence alignment: speech-to-text drops and mangles words
+ * often enough that punishing word order would mostly measure the recogniser,
+ * not the reader.
+ *
+ * Coverage (how much of the script was actually spoken) is weighted more
+ * heavily than extra words, because skipping lines is the failure that matters
+ * — a few inserted words are usually just transcription noise.
+ */
+function scoreAccuracy(text: string, readingText: string): DimensionScore {
+  const spoken = tokenize(text);
+  // Compare against the words to be *said* — "[pause]" cues are not spoken.
+  const script = tokenize(spokenText(readingText));
+  if (script.length === 0) {
+    return dim('accuracy', 70, 'No passage to compare against.', false);
+  }
+  if (spoken.length < 3) {
+    return dim('accuracy', 70, "We couldn't make out enough words to check against the passage.", false);
+  }
+
+  // Multiset overlap: each script word can only be matched once.
+  const remaining = new Map<string, number>();
+  for (const w of script) remaining.set(w, (remaining.get(w) ?? 0) + 1);
+  let matched = 0;
+  for (const w of spoken) {
+    const left = remaining.get(w) ?? 0;
+    if (left > 0) {
+      remaining.set(w, left - 1);
+      matched++;
+    }
+  }
+
+  const coverage = matched / script.length; // how much of the script was said
+  const precision = matched / spoken.length; // how much of what was said was script
+  const score = clamp(coverage * 80 + precision * 20);
+
+  const pct = Math.round(coverage * 100);
+  let detail: string;
+  if (coverage >= 0.9) {
+    detail = `Read the passage almost word-perfect (${pct}% matched). Now focus purely on how it sounds.`;
+  } else if (coverage >= 0.7) {
+    detail = `Got ${pct}% of the passage. A few words drifted — worth a second look before your next take.`;
+  } else if (coverage >= 0.4) {
+    detail = `About ${pct}% of the passage matched. You may have skipped a line, or the mic missed some words.`;
+  } else {
+    detail = `Only ${pct}% of the passage matched. Try again somewhere quieter, reading the whole thing through.`;
+  }
+  return dim('accuracy', score, detail, true);
 }
 
 // ────────────────────── Structure & content scorers ─────────────────────
@@ -287,7 +388,12 @@ export function coachAttempt(
   const words = tokenize(text);
   const wordCount = words.length;
 
-  const lexicalFillers = wordCount >= 5 ? countOccurrences(' ' + text.toLowerCase() + ' ', LEXICAL_FILLERS) : 0;
+  // A scripted rep reads our passage, so transcript-derived judgements about
+  // word choice belong to us, not the presenter. See `scorableDimensions`.
+  const scripted = exercise.type === 'read' && !!exercise.readingText;
+
+  const lexicalFillers =
+    !scripted && wordCount >= 5 ? countOccurrences(' ' + text.toLowerCase() + ' ', LEXICAL_FILLERS) : 0;
   const fillerCount = lexicalFillers + (audio.unavailable ? 0 : audio.filledPauseCount);
 
   const all: Record<Dimension, () => DimensionScore> = {
@@ -295,17 +401,20 @@ export function coachAttempt(
     pauses: () => scorePauses(audio),
     intonation: () => scoreIntonation(audio),
     energy: () => scoreEnergy(audio),
-    fillers: () => scoreFillers(text, wordCount, audio),
+    fillers: () => scoreFillers(text, wordCount, audio, scripted),
+    accuracy: () => scoreAccuracy(text, exercise.readingText ?? ''),
     hook: () => scoreHook(text),
     structure: () => scoreStructure(text, exercise),
     clarity: () => scoreClarity(text),
     concreteness: () => scoreConcreteness(text),
   };
 
-  // Score the exercise's focus dimensions first, then fill in the rest so the
-  // results screen always has a rounded picture.
-  const focus = exercise.focus;
-  const extras = (Object.keys(all) as Dimension[]).filter((d) => !focus.includes(d));
+  // Only score what this exercise type can honestly measure, then order the
+  // exercise's own focus dimensions first so the results screen leads with what
+  // the presenter was actually practising.
+  const scorable = scorableDimensions(exercise);
+  const focus = exercise.focus.filter((d) => scorable.includes(d));
+  const extras = scorable.filter((d) => !focus.includes(d));
   const scores = [...focus, ...extras].map((d) => all[d]());
 
   // Append personal-baseline delta to each measured dimension's detail when
@@ -358,6 +467,7 @@ function quickWinFor(d: Dimension): string {
     intonation: 'Next take: lift your pitch on the words that carry the meaning — the metric, the verb, the ask.',
     energy: 'Next take: say your headline noticeably louder and slower than the words around it.',
     fillers: 'Next take: when you feel an "um" coming, close your mouth and breathe instead.',
+    accuracy: 'Next take: read the passage through silently once first, then record it in one pass.',
     hook: 'Next take: open with your recommendation in one sentence, then back it up.',
     structure: 'Next take: plan three beats first — point, evidence, so-what — then record.',
     clarity: 'Next take: keep every sentence under ~15 words. One idea at a time.',

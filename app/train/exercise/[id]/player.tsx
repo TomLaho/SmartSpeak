@@ -3,9 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { EXERCISES, getExercise, pickVariation, BENCHMARKS } from '@/lib/exercises';
+import {
+  EXERCISES,
+  getExercise,
+  pickVariation,
+  BENCHMARKS,
+  countWords,
+  expectedSeconds,
+} from '@/lib/exercises';
 import { analyzeAudioInWorker, type AudioMetrics } from '@/lib/audio-analysis';
-import { coachAttempt, type CoachResult } from '@/lib/coach';
+import { coachAttempt, paceWpm, type CoachResult } from '@/lib/coach';
 import { loadCalibration, toCalibrationInput } from '@/lib/calibration';
 import {
   transcribeOnDevice,
@@ -415,8 +422,10 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     );
   }
 
-  const targetPct = Math.min(100, (seconds / exercise.targetSeconds) * 100);
-  const reachedTarget = seconds >= exercise.targetSeconds;
+  // Derived, not the authored targetSeconds — see `expectedSeconds`.
+  const target = expectedSeconds(exercise);
+  const targetPct = Math.min(100, (seconds / target) * 100);
+  const reachedTarget = seconds >= target;
 
   // The variation-picked prompt string (for topic/story exercises).
   const activePrompt = exercise.readingText
@@ -458,7 +467,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
           level={level}
           targetPct={targetPct}
           reachedTarget={reachedTarget}
-          targetSeconds={exercise.targetSeconds}
+          targetSeconds={target}
           onStop={stopRecording}
           activePrompt={activePrompt}
           isVariation={isVariation}
@@ -515,6 +524,41 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
   );
 }
 
+/**
+ * A passage laid out for reading aloud from a phone at arm's length.
+ *
+ * Split one sentence per line with generous leading and spacing between them:
+ * a solid block of justified text is easy to lose your place in mid-take, and
+ * the line breaks double as natural breath points for the read.
+ */
+function ReadingPassage({ text }: { text: string }) {
+  const lines = text
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  return (
+    <div className="mt-3 space-y-3">
+      {lines.map((line, i) => (
+        <p key={i} className="text-lg leading-loose text-white/95">
+          {/* Bracketed cues like "[pause]" are directions, not words to read —
+              set them apart so they aren't read aloud by mistake. */}
+          {line.split(/(\[[^\]]*\])/g).map((part, j) =>
+            part.startsWith('[') && part.endsWith(']') ? (
+              <span key={j} className="text-sm font-semibold uppercase tracking-wide text-spotlight/70">
+                {' '}
+                {part.slice(1, -1)}{' '}
+              </span>
+            ) : (
+              <span key={j}>{part}</span>
+            )
+          )}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 // ─────────────────────────────── Intro ───────────────────────────────
 
 function IntroView({
@@ -543,7 +587,7 @@ function IntroView({
           </span>
           <p className="mt-2 text-sm text-white/50">
             {exercise.type === 'read' ? 'Read aloud' : exercise.type === 'story' ? 'Walk it through' : 'Speak to the prompt'} · ~
-            {exercise.targetSeconds}s
+            {expectedSeconds(exercise)}s
           </p>
           <h1 className="mt-1 text-3xl font-bold">{exercise.title}</h1>
           <p className="mt-1 text-white/60">{exercise.summary}</p>
@@ -595,11 +639,16 @@ function IntroView({
           </div>
         )}
 
-        {/* Reading text (unchanged) */}
+        {/* Reading text */}
         {exercise.readingText && (
           <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-white/40">Read this aloud</p>
-            <p className="mt-1.5 text-lg leading-relaxed">{exercise.readingText}</p>
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-white/40">Read this aloud</p>
+              <p className="shrink-0 text-xs text-white/35">
+                {countWords(exercise.readingText)} words · ~{expectedSeconds(exercise)}s
+              </p>
+            </div>
+            <ReadingPassage text={exercise.readingText} />
           </div>
         )}
 
@@ -695,7 +744,7 @@ function RecordingView({
         {exercise.readingText && (
           <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-white/40">Read this aloud</p>
-            <p className="mt-1.5 text-lg leading-relaxed">{exercise.readingText}</p>
+            <ReadingPassage text={exercise.readingText} />
           </div>
         )}
         {activePrompt && (
@@ -942,8 +991,8 @@ function ResultsView({
           {!metrics.unavailable && (
             <div>
               <div className="grid grid-cols-4 gap-2 text-center">
-                <Stat label="Speaking" value={`${Math.round(metrics.speakingSec)}s`} />
-                <Stat label="Pace" value={`${metrics.articulationWpm ?? metrics.estimatedWpm ?? '—'}`} sub="wpm" />
+                <Stat label="Length" value={`${Math.round(metrics.durationSec)}s`} />
+                <Stat label="Pace" value={`${paceWpm(metrics) ?? '—'}`} sub="wpm" />
                 <Stat label="Pauses" value={`${metrics.pauseCount}`} />
                 <Stat label="Fillers" value={`${result.fillerCount}`} />
               </div>
