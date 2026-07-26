@@ -72,21 +72,45 @@ export function nextInModule(progress: Progress, moduleId: ModuleId): Exercise {
 }
 
 /**
- * Returns mastery progress stats for a module.
- * masteredCount = exercises with bestScore >= 70.
- * pct = round(masteredCount / total * 100).
+ * Returns progress stats for a module.
+ *
+ * Completion and mastery are tracked separately: a rep you have done counts as
+ * completed straight away, but only counts as mastered at bestScore >= 70. The
+ * UI draws its progress bar from `completedPct` so it moves after every rep,
+ * and reserves the "Mastered" label for `pct === 100`.
+ *
+ * masteredCount = exercises with bestScore >= 70 · pct = masteredCount / total.
+ * completedCount = exercises attempted at least once · completedPct likewise.
  * started = any exercise in the module has been attempted.
  */
 export function moduleProgress(
   progress: Progress,
   moduleId: ModuleId
-): { masteredCount: number; total: number; pct: number; started: boolean } {
+): {
+  masteredCount: number;
+  completedCount: number;
+  total: number;
+  pct: number;
+  completedPct: number;
+  started: boolean;
+} {
   const exercises = exercisesByModule(moduleId);
   const total = exercises.length;
   const masteredCount = exercises.filter((e) => isMastered(progress, e.id)).length;
-  const started = exercises.some((e) => (progress.exercises[e.id]?.attempts ?? 0) > 0);
+  const completedCount = exercises.filter((e) => (progress.exercises[e.id]?.attempts ?? 0) > 0).length;
   const pct = total > 0 ? Math.round((masteredCount / total) * 100) : 0;
-  return { masteredCount, total, pct, started };
+  const completedPct = total > 0 ? Math.round((completedCount / total) * 100) : 0;
+  return { masteredCount, completedCount, total, pct, completedPct, started: completedCount > 0 };
+}
+
+/**
+ * Human-readable module status for the home list and module header.
+ * Mastered (every rep >=70) → All reps done → In progress → Start module.
+ */
+export function moduleStatusLabel(mp: { pct: number; completedPct: number; started: boolean }): string {
+  if (mp.pct === 100) return 'Mastered';
+  if (mp.completedPct === 100) return 'All reps done';
+  return mp.started ? 'In progress' : 'Start module';
 }
 
 // ─────────────────── Core selector ───────────────────

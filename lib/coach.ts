@@ -323,10 +323,12 @@ export function coachAttempt(
     }
   }
 
-  // Overall = weighted toward the exercise's focus dimensions.
+  // Overall = straight (unweighted) average of every dimension shown on the
+  // results screen, so the headline number always reconciles with the
+  // breakdown the user can see. Falls back to all scores if none are measured.
   const focusScores = scores.filter((s) => focus.includes(s.dimension));
-  const measuredFocus = focusScores.filter((s) => s.measured);
-  const base = measuredFocus.length ? measuredFocus : focusScores;
+  const measured = scores.filter((s) => s.measured);
+  const base = measured.length ? measured : scores;
   const overallScore = base.length === 0 ? 0 : clamp(base.reduce((a, s) => a + s.score, 0) / base.length);
 
   const ranked = [...scores].filter((s) => s.measured).sort((a, b) => b.score - a.score);

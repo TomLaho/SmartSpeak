@@ -965,7 +965,12 @@ function ResultsView({
               placeholder="No words captured — type what you said for structure & content feedback."
               className="w-full rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm text-white/80 placeholder:text-white/25"
             />
-            <Button onClick={onRescore} variant="secondary" size="sm" className="mt-2 bg-white/10 hover:bg-white/20">
+            <Button
+              onClick={onRescore}
+              variant="secondary"
+              size="sm"
+              className="mt-2 border border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+            >
               Re-score
             </Button>
           </div>
@@ -984,7 +989,11 @@ function ResultsView({
         </div>
 
         <div className="mt-3 flex gap-3">
-          <Button onClick={onRetry} variant="secondary" className="h-12 flex-1 rounded-2xl bg-white/10 hover:bg-white/20">
+          <Button
+            onClick={onRetry}
+            variant="secondary"
+            className="h-12 flex-1 rounded-2xl border border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+          >
             Try again
           </Button>
           <Button onClick={onDone} className="h-12 flex-1 rounded-2xl bg-spotlight text-ink hover:bg-spotlight-soft">

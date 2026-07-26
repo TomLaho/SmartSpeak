@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
   EXERCISES,
   MODULES,
@@ -26,7 +25,7 @@ import {
   FREE_EXERCISE_LIMIT,
   PRO_PRICE,
 } from '@/lib/entitlement';
-import { recommendNext, moduleProgress } from '@/lib/selection';
+import { recommendNext, moduleProgress, moduleStatusLabel } from '@/lib/selection';
 import { Ring } from '@/components/train/ring';
 import { LevelBar } from '@/components/train/level-bar';
 import { LogoMark } from '@/components/brand/logo';
@@ -35,7 +34,6 @@ import { cn } from '@/lib/utils';
 const ONBOARDING_KEY = 'smartspeak.onboarded.v1';
 
 export default function TrainHome() {
-  const router = useRouter();
   const [progress, setProgress] = useState<Progress | null>(null);
   const [showCalNudge, setShowCalNudge] = useState(false);
   const [pro, setPro] = useState(false);
@@ -102,17 +100,12 @@ export default function TrainHome() {
     setShowOnboarding(false);
   }
 
-  function startFirstRep() {
-    dismissOnboarding();
-    router.push(`/train/exercise/${upNext.id}`);
-  }
-
   return (
     <div className="px-5 pb-8 pt-5">
       {/* First-run onboarding overlay */}
       {showOnboarding && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center">
-          <div className="relative w-full max-w-md rounded-t-3xl border border-white/10 bg-[#0f0e0c] p-6 pb-8 sm:rounded-3xl">
+        <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/70 backdrop-blur-sm sm:items-center">
+          <div className="relative max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-white/10 bg-[#0f0e0c] p-6 pb-[max(2rem,env(safe-area-inset-bottom))] sm:rounded-3xl">
             <button
               onClick={dismissOnboarding}
               aria-label="Skip intro"
@@ -138,12 +131,19 @@ export default function TrainHome() {
                 </li>
               ))}
             </ul>
+            {/* Dismiss to the home screen rather than launching straight into a
+                rep — first-run users need to see the modules and pick their own
+                starting point before being dropped into an exercise. */}
             <button
-              onClick={startFirstRep}
+              onClick={dismissOnboarding}
               className="block w-full rounded-2xl bg-spotlight py-3.5 text-center text-sm font-bold text-ink transition-opacity active:opacity-80"
             >
-              Start my first rep
+              Have a look around
             </button>
+            <p className="mt-3 text-center text-xs text-white/40">
+              Pick a module below, or tap <span className="font-semibold text-white/60">Start here</span> for the
+              recommended first rep.
+            </p>
           </div>
         </div>
       )}
@@ -319,8 +319,10 @@ export default function TrainHome() {
                 </Link>
               );
             }
-            const mp = progress ? moduleProgress(progress, module.id as ModuleId) : { pct: 0, started: false, masteredCount: 0, total: 0 };
-            const statusLabel = mp.pct === 100 ? 'Mastered' : mp.started ? 'In progress' : 'Start module';
+            const mp = progress
+              ? moduleProgress(progress, module.id as ModuleId)
+              : { pct: 0, completedPct: 0, started: false, masteredCount: 0, completedCount: 0, total: 0 };
+            const statusLabel = moduleStatusLabel(mp);
             return (
               <Link
                 key={module.id}
@@ -336,7 +338,7 @@ export default function TrainHome() {
                   <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/10">
                     <div
                       className="h-full rounded-full transition-all"
-                      style={{ width: `${mp.pct}%`, backgroundColor: module.accent }}
+                      style={{ width: `${mp.completedPct}%`, backgroundColor: module.accent }}
                     />
                   </div>
                   <p className="mt-1 text-[10px]" style={{ color: mp.pct === 100 ? '#FFC857' : mp.started ? module.accent : 'rgba(255,255,255,0.35)' }}>

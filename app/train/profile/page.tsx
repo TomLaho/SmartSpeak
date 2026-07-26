@@ -189,7 +189,11 @@ export default function ProfilePage() {
               >
                 Reset
               </Button>
-              <Button onClick={() => setConfirming(false)} variant="secondary" className="flex-1 bg-white/10 hover:bg-white/20">
+              <Button
+                onClick={() => setConfirming(false)}
+                variant="secondary"
+                className="flex-1 border border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+              >
                 Cancel
               </Button>
             </div>

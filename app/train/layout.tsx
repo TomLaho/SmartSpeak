@@ -20,7 +20,10 @@ export default function TrainLayout({ children }: { children: ReactNode }) {
               'radial-gradient(ellipse at top, rgba(255,200,87,0.10) 0%, transparent 60%)',
           }}
         />
-        <div className="relative z-10 flex-1">{children}</div>
+        {/* No z-index here on purpose: a positive one would create a stacking
+            context that traps page-level modals below the z-30 tab bar. As a
+            positioned sibling later in DOM order it still paints above the glow. */}
+        <div className="relative flex-1">{children}</div>
         <TabBar />
       </div>
     </div>

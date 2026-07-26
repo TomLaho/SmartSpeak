@@ -17,9 +17,12 @@ import {
   isModuleUnlocked,
   PRO_PRICE,
 } from '@/lib/entitlement';
-import { nextInModule, moduleProgress, isMastered } from '@/lib/selection';
+import { nextInModule, moduleProgress, moduleStatusLabel, isMastered } from '@/lib/selection';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+
+/** Where a step sits in the path — drives its node styling and subtitle. */
+type StepState = 'mastered' | 'done' | 'current' | 'upcoming' | 'locked';
 
 export default function ModulePage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -50,40 +53,46 @@ export default function ModulePage({ params }: { params: { id: string } }) {
   const exercises = exercisesByModule(moduleId);
   const mp = progress
     ? moduleProgress(progress, moduleId)
-    : { pct: 0, started: false, masteredCount: 0, total: exercises.length };
+    : {
+        pct: 0,
+        completedPct: 0,
+        started: false,
+        masteredCount: 0,
+        completedCount: 0,
+        total: exercises.length,
+      };
 
-  const statusLabel =
-    mp.pct === 100 ? 'Mastered' : mp.started ? 'In progress' : 'Start module';
+  const statusLabel = moduleStatusLabel(mp);
 
-  // Completed = exercises with at least one attempt, in module order.
-  const completedExercises = progress
-    ? exercises.filter((e) => (progress.exercises[e.id]?.attempts ?? 0) > 0)
-    : [];
-
-  // Next exercise via nextInModule helper.
+  // The step the user should do next — highlighted as "current" in the path.
   const next = progress ? nextInModule(progress, moduleId) : exercises[0];
 
-  // Determine if next exercise is accessible.
-  const nextAlreadyAttempted = progress
-    ? (progress.exercises[next.id]?.attempts ?? 0) > 0
-    : false;
   // Exclude FREE_PLAY_ID so free-play never burns a preview slot.
   const distinctAttempted = progress
     ? Object.entries(progress.exercises).filter(
         ([id, e]) => e.attempts > 0 && id !== FREE_PLAY_ID
       ).length
     : 0;
-  const nextAccessible = canAccessExercise({
-    pro,
-    alreadyAttempted: nextAlreadyAttempted,
-    distinctAttempted,
-  });
 
-  const locked = !isModuleUnlocked({ pro, order: learningModule.order });
+  const moduleLocked = !isModuleUnlocked({ pro, order: learningModule.order });
 
-  const ctaHref = locked || !nextAccessible
-    ? '/train/unlock'
-    : `/train/exercise/${next.id}`;
+  function stateFor(exerciseId: string): StepState {
+    const attempts = progress?.exercises[exerciseId]?.attempts ?? 0;
+    if (attempts > 0) {
+      return progress && isMastered(progress, exerciseId) ? 'mastered' : 'done';
+    }
+    const accessible = canAccessExercise({
+      pro,
+      alreadyAttempted: false,
+      distinctAttempted,
+    });
+    if (moduleLocked || !accessible) return 'locked';
+    return exerciseId === next.id ? 'current' : 'upcoming';
+  }
+
+  const ctaState = stateFor(next.id);
+  const ctaHref =
+    ctaState === 'locked' ? '/train/unlock' : `/train/exercise/${next.id}`;
 
   return (
     <div className="flex min-h-[100dvh] flex-col px-5 pb-8 pt-5">
@@ -95,7 +104,7 @@ export default function ModulePage({ params }: { params: { id: string } }) {
       </div>
 
       {/* Module header */}
-      <div className="mb-6">
+      <div className="mb-7">
         <div
           className={cn(
             'mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br text-3xl',
@@ -107,112 +116,231 @@ export default function ModulePage({ params }: { params: { id: string } }) {
         <h1 className="text-3xl font-bold leading-tight">{learningModule.name}</h1>
         <p className="mt-1 text-white/55">{learningModule.blurb}</p>
 
-        {/* Progress bar */}
+        {/* Progress bar — completion-based so it moves after every rep */}
         <div className="mt-4">
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
             <div
               className="h-full rounded-full transition-all"
-              style={{ width: `${mp.pct}%`, backgroundColor: learningModule.accent }}
+              style={{
+                width: `${mp.completedPct}%`,
+                backgroundColor: learningModule.accent,
+              }}
             />
           </div>
-          <p
-            className="mt-1.5 text-xs font-medium"
-            style={{
-              color:
-                mp.pct === 100
-                  ? '#FFC857'
-                  : mp.started
-                  ? learningModule.accent
-                  : 'rgba(255,255,255,0.35)',
-            }}
-          >
-            {statusLabel}
-          </p>
+          <div className="mt-1.5 flex items-center justify-between">
+            <p
+              className="text-xs font-medium"
+              style={{
+                color:
+                  mp.pct === 100
+                    ? '#FFC857'
+                    : mp.started
+                    ? learningModule.accent
+                    : 'rgba(255,255,255,0.35)',
+              }}
+            >
+              {statusLabel}
+            </p>
+            <p className="text-xs text-white/40">
+              {mp.completedCount} of {mp.total} done
+              {mp.masteredCount > 0 && ` · ${mp.masteredCount} ✦`}
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Completed reps */}
-      <div className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-white/40">
-          Completed
-        </h2>
-        {completedExercises.length === 0 ? (
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-            <p className="text-sm text-white/45">
-              Your finished reps will appear here.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {completedExercises.map((exercise) => {
-              const ep = progress?.exercises[exercise.id];
-              const mastered = progress ? isMastered(progress, exercise.id) : false;
-              const best = ep?.bestScore;
-              return (
-                <Link
-                  key={exercise.id}
-                  href={`/train/exercise/${exercise.id}`}
-                  className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 transition-colors hover:bg-white/[0.08]"
-                >
-                  <span className="text-xl">{exercise.emoji}</span>
-                  <p className="flex-1 truncate text-sm font-semibold">
-                    {exercise.title}
-                  </p>
-                  {typeof best === 'number' && (
-                    <p
-                      className="shrink-0 text-sm font-bold"
-                      style={{ color: mastered ? '#FFC857' : learningModule.accent }}
-                    >
-                      {mastered ? '✦ ' : ''}{best}
-                    </p>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Next up — mysterious card (locked modules tease the unlock) */}
+      {/* The path — every rep in the module, in order, always visible */}
       <div className="mb-8">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-white/40">
-          Next up
+        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-white/40">
+          Your path
         </h2>
-        <Link
-          href={ctaHref}
-          className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.05] p-4 transition-colors hover:bg-white/[0.08] active:scale-[0.99]"
-        >
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-xl text-white/30">
-            {locked ? '🔒' : '?'}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="font-semibold">{locked ? 'Locked' : 'Next up'}</p>
-            <p className="text-xs text-white/45">
-              {locked
-                ? distinctAttempted === 0
-                  ? 'Included in SmartSpeak Pro.'
-                  : `Unlock every module with Pro · ${PRO_PRICE}.`
-                : 'Keep going to reveal it.'}
-            </p>
-          </div>
-          <span className="shrink-0 text-white/30">›</span>
-        </Link>
+        <ol className="space-y-0">
+          {exercises.map((exercise, i) => {
+            const state = stateFor(exercise.id);
+            const ep = progress?.exercises[exercise.id];
+            const best = ep?.bestScore;
+            const isLast = i === exercises.length - 1;
+            // The connector below this node is "lit" once this step is done.
+            const connectorLit = state === 'done' || state === 'mastered';
+
+            return (
+              <li key={exercise.id} className="flex gap-4">
+                {/* Node + connector rail */}
+                <div className="flex w-12 shrink-0 flex-col items-center">
+                  <PathNode
+                    state={state}
+                    emoji={exercise.emoji}
+                    accent={learningModule.accent}
+                  />
+                  {!isLast && (
+                    <div
+                      className="w-0.5 flex-1 rounded-full transition-colors"
+                      style={{
+                        minHeight: 24,
+                        backgroundColor: connectorLit
+                          ? learningModule.accent
+                          : 'rgba(255,255,255,0.10)',
+                      }}
+                    />
+                  )}
+                </div>
+
+                {/* Step card */}
+                <StepCard
+                  exercise={exercise}
+                  state={state}
+                  best={best}
+                  accent={learningModule.accent}
+                  isLast={isLast}
+                />
+              </li>
+            );
+          })}
+        </ol>
       </div>
 
       {/* Primary CTA */}
       <Button
         onClick={() => router.push(ctaHref)}
         size="lg"
-        className="h-14 w-full rounded-2xl bg-spotlight text-base text-ink hover:bg-spotlight-soft"
+        className="mt-auto h-14 w-full rounded-2xl bg-spotlight text-base text-ink hover:bg-spotlight-soft"
       >
-        {locked
+        {ctaState === 'locked'
           ? distinctAttempted === 0
             ? "See what's in Pro"
             : `Unlock · ${PRO_PRICE}`
           : mp.started
-          ? 'Continue module'
-          : 'Start module'}
+          ? `Continue · ${next.title}`
+          : `Start · ${next.title}`}
       </Button>
     </div>
+  );
+}
+
+/** Circular path node — mirrors the step's state at a glance. */
+function PathNode({
+  state,
+  emoji,
+  accent,
+}: {
+  state: StepState;
+  emoji: string;
+  accent: string;
+}) {
+  if (state === 'mastered') {
+    return (
+      <div
+        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-lg font-bold text-ink"
+        style={{ backgroundColor: '#FFC857' }}
+      >
+        ✦
+      </div>
+    );
+  }
+  if (state === 'done') {
+    return (
+      <div
+        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-lg font-bold text-ink"
+        style={{ backgroundColor: accent }}
+      >
+        ✓
+      </div>
+    );
+  }
+  if (state === 'current') {
+    return (
+      <div
+        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-xl ring-4"
+        style={{
+          backgroundColor: 'rgba(255,255,255,0.10)',
+          // Tailwind can't express a dynamic ring colour, so drive it inline.
+          boxShadow: `0 0 0 3px ${accent}55`,
+        }}
+      >
+        {emoji}
+      </div>
+    );
+  }
+  if (state === 'locked') {
+    return (
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-base text-white/30">
+        🔒
+      </div>
+    );
+  }
+  return (
+    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-xl opacity-45">
+      {emoji}
+    </div>
+  );
+}
+
+/** The tappable card beside each node. */
+function StepCard({
+  exercise,
+  state,
+  best,
+  accent,
+  isLast,
+}: {
+  exercise: { id: string; title: string; summary: string };
+  state: StepState;
+  best: number | undefined;
+  accent: string;
+  isLast: boolean;
+}) {
+  const href = state === 'locked' ? '/train/unlock' : `/train/exercise/${exercise.id}`;
+
+  const subtitle =
+    state === 'mastered'
+      ? 'Mastered — replay to beat your best'
+      : state === 'done'
+      ? 'Done — try again to raise your score'
+      : state === 'current'
+      ? exercise.summary
+      : state === 'locked'
+      ? `Unlock with Pro · ${PRO_PRICE}`
+      : exercise.summary;
+
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'mb-3 min-w-0 flex-1 rounded-2xl border px-4 py-3 transition-colors active:scale-[0.99]',
+        isLast && 'mb-0',
+        state === 'current'
+          ? 'border-spotlight/40 bg-spotlight/10 hover:bg-spotlight/15'
+          : state === 'upcoming' || state === 'locked'
+          ? 'border-white/10 bg-white/[0.03] hover:bg-white/[0.06]'
+          : 'border-white/10 bg-white/[0.05] hover:bg-white/[0.08]'
+      )}
+    >
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <p
+            className={cn(
+              'truncate text-sm font-semibold',
+              state === 'upcoming' || state === 'locked' ? 'text-white/55' : 'text-white'
+            )}
+          >
+            {exercise.title}
+          </p>
+          <p className="mt-0.5 line-clamp-2 text-xs text-white/45">{subtitle}</p>
+        </div>
+        {typeof best === 'number' && (state === 'done' || state === 'mastered') && (
+          <p
+            className="shrink-0 text-sm font-bold"
+            style={{ color: state === 'mastered' ? '#FFC857' : accent }}
+          >
+            {best}
+          </p>
+        )}
+        {state === 'current' && (
+          <span className="shrink-0 rounded-full bg-spotlight px-3 py-1 text-xs font-bold text-ink">
+            Go
+          </span>
+        )}
+      </div>
+    </Link>
   );
 }

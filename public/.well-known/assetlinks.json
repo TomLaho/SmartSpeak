@@ -5,7 +5,8 @@
       "namespace": "android_app",
       "package_name": "app.smartspeak.twa",
       "sha256_cert_fingerprints": [
-        "58:5F:7C:A8:ED:AC:8F:36:C4:C0:1E:BF:58:1F:32:2F:73:25:8A:20:CF:50:D5:B6:58:ED:23:CD:15:2B:56:98"
+        "58:5F:7C:A8:ED:AC:8F:36:C4:C0:1E:BF:58:1F:32:2F:73:25:8A:20:CF:50:D5:B6:58:ED:23:CD:15:2B:56:98",
+        "A9:9C:E7:CF:51:D6:3E:82:D9:92:B8:A5:E7:30:DA:9E:D5:1D:53:B5:5B:76:39:9A:12:3B:2B:68:C7:16:3C:1E"
       ]
     }
   }
