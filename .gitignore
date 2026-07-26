@@ -13,3 +13,9 @@ tsconfig.tsbuildinfo
 Google Play package.zip
 *.keystore
 .twa-inspect/
+
+# Bubblewrap/Gradle Android wrapper project.
+# Ignored wholesale and deliberately: it contains the upload keystore AND the
+# keystore password in cleartext in android/app/build.gradle. Nothing in here
+# belongs in the repo — the TWA is rebuilt from twa-manifest.json when needed.
+/android/
