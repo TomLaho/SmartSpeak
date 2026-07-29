@@ -100,6 +100,14 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
   // Mirrors `audioUrl` so the object URL can be revoked from cleanup paths that
   // don't re-run on every render (unmount, retry).
   const audioUrlRef = useRef<string | null>(null);
+  // True once the user has deliberately ended a take by tapping Stop. From that
+  // moment the recording is theirs and must still be scored, so teardown leaves
+  // the recorder's handlers alone — `stop()` fires its event as a queued task,
+  // and detaching in the gap would drop a finished take with no error shown.
+  const takeCommittedRef = useRef(false);
+  // Set on teardown so a committed take's queued `stop` handler still scores
+  // the rep but skips the UI-only work whose cleanup is already gone.
+  const unmountedRef = useRef(false);
 
   /**
    * Point the results player at a take's audio, releasing the previous one.
@@ -140,13 +148,16 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
   const cleanup = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
-    // Detach the recorder's handlers BEFORE the tracks stop. Ending every track
-    // makes the stream inactive, which stops the recorder and fires `stop` —
-    // so leaving onstop attached would score and record a take the user
-    // abandoned (closing mid-recording, or navigating away), burning one of
-    // their free preview slots for a rep they never finished.
+    // Detach the recorder's handlers BEFORE the tracks stop — but only for a
+    // take the user never committed. Ending every track makes the stream
+    // inactive, which stops the recorder and fires `stop`, so leaving onstop
+    // attached would score and record a take they abandoned (closing
+    // mid-recording, or navigating away), burning one of their free preview
+    // slots for a rep they never finished. Once Stop has been tapped the
+    // opposite is true: the queued `stop` event must still run or the finished
+    // take disappears.
     const recorder = recorderRef.current;
-    if (recorder) {
+    if (recorder && !takeCommittedRef.current) {
       recorder.ondataavailable = null;
       recorder.onstop = null;
       recorder.onerror = null;
@@ -162,6 +173,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
 
   useEffect(
     () => () => {
+      unmountedRef.current = true;
       cleanup();
       if (audioUrlRef.current) {
         URL.revokeObjectURL(audioUrlRef.current);
@@ -326,6 +338,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
 
   const startRecording = useCallback(async () => {
     warmUpTranscriber();
+    takeCommittedRef.current = false;
     setError(null);
     setTranscript('');
     setSeconds(0);
@@ -348,7 +361,9 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
       recorder.onstop = () => {
         const blobType = mimeType || recorder.mimeType || 'audio/webm';
         const blob = new Blob(chunksRef.current, { type: blobType });
-        setTakeAudio(URL.createObjectURL(blob));
+        // Skip the object URL when the screen is already gone: nothing will
+        // render it, and no cleanup path is left to revoke it.
+        if (!unmountedRef.current) setTakeAudio(URL.createObjectURL(blob));
         void finishAnalysis(blob);
       };
       recorder.onerror = () => {
@@ -402,6 +417,8 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
   }, [cleanup, finishAnalysis, setTakeAudio]);
 
   const stopRecording = useCallback(() => {
+    // From here the take belongs to the user — see takeCommittedRef.
+    takeCommittedRef.current = true;
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
     setLevel(0);
