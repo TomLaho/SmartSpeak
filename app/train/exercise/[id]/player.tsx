@@ -97,7 +97,22 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const rafRef = useRef<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const transcriptRef = useRef('');
+  // Mirrors `audioUrl` so the object URL can be revoked from cleanup paths that
+  // don't re-run on every render (unmount, retry).
+  const audioUrlRef = useRef<string | null>(null);
+
+  /**
+   * Point the results player at a take's audio, releasing the previous one.
+   *
+   * Object URLs pin the whole recording in memory until they're revoked or the
+   * document unloads — and a TWA document lives for the entire session, so a
+   * take-per-rep leak adds up fast on a phone.
+   */
+  const setTakeAudio = useCallback((url: string | null) => {
+    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+    audioUrlRef.current = url;
+    setAudioUrl(url);
+  }, []);
 
   // Load persisted challenge + default to exercise's primary focus on mount.
   useEffect(() => {
@@ -125,6 +140,18 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
   const cleanup = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
+    // Detach the recorder's handlers BEFORE the tracks stop. Ending every track
+    // makes the stream inactive, which stops the recorder and fires `stop` —
+    // so leaving onstop attached would score and record a take the user
+    // abandoned (closing mid-recording, or navigating away), burning one of
+    // their free preview slots for a rep they never finished.
+    const recorder = recorderRef.current;
+    if (recorder) {
+      recorder.ondataavailable = null;
+      recorder.onstop = null;
+      recorder.onerror = null;
+      recorderRef.current = null;
+    }
     audioCtxRef.current?.close().catch(() => {});
     streamRef.current?.getTracks().forEach((t) => t.stop());
     rafRef.current = null;
@@ -133,7 +160,16 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     streamRef.current = null;
   }, []);
 
-  useEffect(() => () => cleanup(), [cleanup]);
+  useEffect(
+    () => () => {
+      cleanup();
+      if (audioUrlRef.current) {
+        URL.revokeObjectURL(audioUrlRef.current);
+        audioUrlRef.current = null;
+      }
+    },
+    [cleanup]
+  );
 
   // Gate deep links: free users get FREE_EXERCISE_LIMIT distinct exercises.
   // Free-play has its own separate gate (1 free use; never burns a preview slot).
@@ -176,10 +212,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
         try {
           setTranscribeStatus({ stage: 'loading' });
           text = (await transcribeOnDevice(blob, (p) => setTranscribeStatus(p))).trim();
-          if (text) {
-            transcriptRef.current = text;
-            setTranscript(text);
-          }
+          if (text) setTranscript(text);
         } catch (err: any) {
           transcriptionError = `on-device transcription: ${err?.message ?? 'failed'}`;
         } finally {
@@ -295,7 +328,6 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     warmUpTranscriber();
     setError(null);
     setTranscript('');
-    transcriptRef.current = '';
     setSeconds(0);
     chunksRef.current = [];
 
@@ -316,7 +348,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
       recorder.onstop = () => {
         const blobType = mimeType || recorder.mimeType || 'audio/webm';
         const blob = new Blob(chunksRef.current, { type: blobType });
-        setAudioUrl(URL.createObjectURL(blob));
+        setTakeAudio(URL.createObjectURL(blob));
         void finishAnalysis(blob);
       };
       recorder.onerror = () => {
@@ -367,7 +399,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
         setError('Microphone access is required. Please allow it and try again.');
       }
     }
-  }, [cleanup, finishAnalysis]);
+  }, [cleanup, finishAnalysis, setTakeAudio]);
 
   const stopRecording = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -395,9 +427,8 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     setResult(null);
     setMetrics(null);
     setReward(null);
-    setAudioUrl(null);
+    setTakeAudio(null);
     setTranscript('');
-    transcriptRef.current = '';
     setTranscriptionDiag(null);
     setTranscribeStatus(null);
     setCelebrationShow(false);
@@ -409,7 +440,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     // variation (the mount-time value goes stale after a recorded take).
     if (exercise) setAttemptCount(loadProgress().exercises[exercise.id]?.attempts ?? 0);
     setPhase('intro');
-  }, [cleanup, exercise]);
+  }, [cleanup, exercise, setTakeAudio]);
 
   if (!exercise) {
     return (

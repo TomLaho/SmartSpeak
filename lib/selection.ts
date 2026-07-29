@@ -28,32 +28,6 @@ export function isMastered(progress: Progress, exerciseId: string): boolean {
   return !!ex && ex.bestScore >= 70;
 }
 
-/**
- * Returns a message when the presenter needs more clean reps before the next
- * level unlocks, or null if there is no gate.
- *
- * "Clean rep" = score >= 70. The gate requires at least 2 clean reps per
- * exercise before treating a track level as complete.
- */
-export function masteryGateMessage(progress: Progress, trackId: string): string | null {
-  const trackExercises = EXERCISES.filter((e) => e.track === trackId);
-  let needed = 0;
-  for (const ex of trackExercises) {
-    const ep = progress.exercises[ex.id];
-    if (!ep) {
-      needed += 2; // not started: needs 2 clean reps
-      continue;
-    }
-    // TODO: overcounts — uses total attempts capped at 2 rather than counting attempts
-    // whose individual score was ≥70. ExerciseProgress only stores bestScore, not per-attempt
-    // scores, so fixing this requires new data plumbing (e.g. storing an array of scores).
-    const cleanReps = ep.attempts > 0 && ep.bestScore >= 70 ? Math.min(ep.attempts, 2) : 0;
-    if (cleanReps < 2) needed += 2 - cleanReps;
-  }
-  if (needed === 0) return null;
-  return `${needed} more clean rep${needed === 1 ? '' : 's'} to unlock the next level.`;
-}
-
 // ─────────────────── Module helpers ───────────────────
 
 /**
