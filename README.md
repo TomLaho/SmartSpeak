@@ -40,8 +40,22 @@ The trainer is a standalone, installable PWA, which is the recommended on-ramp t
 - `lib/coach.ts` deterministic, on-device delivery + structure/content scoring
 - `lib/local-store.ts` zero-backend progress/streak/XP store (`localStorage`)
 - `lib/entitlement.ts` free-preview gating + Play Billing (Digital Goods) unlock
+- `lib/selection.ts` adaptive next-rep recommendation + module progress
+- `lib/achievements.ts` deterministic on-device achievement evaluation
 - `public/models/` self-hosted quantized `whisper-tiny.en` weights
+- `tests/` Vitest suite over the pure logic (progress store, entitlement, coach, achievements, selection)
 
 ## Testing
-- Run `pnpm lint` to lint the codebase.
-- Use `pnpm dev` for local validation and manual end-to-end checks.
+
+```
+pnpm test        # Vitest — the deterministic logic (streaks, gating, scoring)
+pnpm typecheck   # tsc --noEmit
+pnpm lint        # next lint
+```
+
+`pnpm test:watch` reruns on change. The suite covers the modules where being
+wrong is expensive and behaviour is deterministic: the progress/streak store,
+entitlement gates, coach scoring, achievements and next-rep selection. Browser
+surfaces (recording, transcription, Play Billing) are validated with `pnpm dev`
+and a real device — they can't be meaningfully unit-tested without mocking away
+the thing under test.

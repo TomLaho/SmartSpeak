@@ -7,12 +7,13 @@
  * network, no backend. The unlocked set is persisted to a separate localStorage
  * key so it survives progress resets without being tangled with the main store.
  *
- * Circular-import safety: this module imports types from exercises/coach only
- * via `import type` and reads Progress shape from local-store types only, never
- * calling local-store functions (callers wire the two together).
+ * Circular-import safety: `exercises` is a leaf module (it imports nothing), so
+ * importing the curriculum here is safe. Everything else — coach results and
+ * the Progress shape — comes in as `import type` only; this module never calls
+ * local-store functions (callers wire the two together).
  */
 
-import type { Dimension } from './exercises';
+import { EXERCISES, type Dimension } from './exercises';
 import type { CoachResult } from './coach';
 import type { Progress } from './local-store';
 
@@ -150,14 +151,20 @@ function checkFirstRep(ctx: AchievementContext): boolean {
 }
 
 function checkFillerFree(ctx: AchievementContext): boolean {
+  // fillerCount is also 0 when nothing could be counted — no audio, or a take
+  // too short to measure. Require the dimension to have actually been scored,
+  // or a silent/failed take earns the badge.
+  const fillers = ctx.result.scores.find((s) => s.dimension === ('fillers' as Dimension));
+  if (!fillers?.measured) return false;
   return ctx.result.fillerCount === 0;
 }
 
 function checkPaceZone(ctx: AchievementContext): boolean {
   const pace = ctx.result.scores.find((s) => s.dimension === ('pace' as Dimension));
   if (!pace || !pace.measured) return false;
-  // A score of >=80 on pace correlates with landing in the 130–160 wpm zone
-  // (the bell peaks at 145 wpm with span 75 — score >=80 maps to ~120–170 wpm).
+  // scorePace is a plateau: full marks across 125–165 wpm, decaying over a
+  // 45 wpm span either side. A score of >=80 therefore covers ~116–174 wpm —
+  // the advertised 130–160 band sits comfortably inside it.
   return pace.score >= 80;
 }
 
@@ -182,9 +189,6 @@ function checkSpecialist(ctx: AchievementContext): boolean {
 }
 
 function checkExplorer(ctx: AchievementContext): boolean {
-  // Import exercise list to check tracks — inline require avoids a top-level
-  // circular import while keeping this file dependency-light.
-  const { EXERCISES } = require('./exercises') as typeof import('./exercises');
   const tracks = new Set<string>();
   for (const id of Object.keys(ctx.progress.exercises)) {
     const ex = EXERCISES.find((e) => e.id === id);

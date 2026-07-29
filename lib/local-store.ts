@@ -9,8 +9,6 @@
  * the database keyed by user.)
  */
 
-import { DAILY_GOAL_XP } from './exercises';
-
 const KEY = 'smartspeak.progress.v1';
 const DAILY_GOAL_REPS_KEY = 'smartspeak.dailyGoalReps.v1';
 const LAST_CHALLENGE_KEY = 'smartspeak.lastChallenge.v1';
@@ -49,15 +47,26 @@ export interface Progress {
   graceUsedDay?: string | null;
 }
 
-const EMPTY: Progress = {
-  xp: 0,
-  streak: 0,
-  lastPracticeDay: null,
-  todayXp: 0,
-  todayDay: null,
-  exercises: {},
-  history: [],
-};
+/**
+ * A fresh blank progress object.
+ *
+ * Must be a factory, not a shared constant: `history` and `exercises` are
+ * mutated in place by `recordAttempt`, so spreading a shared constant would
+ * hand every caller the *same* nested array and object. A single rep would then
+ * pollute the blank state for the rest of the session — leaving "Reset
+ * progress" writing the old history straight back to storage.
+ */
+function emptyProgress(): Progress {
+  return {
+    xp: 0,
+    streak: 0,
+    lastPracticeDay: null,
+    todayXp: 0,
+    todayDay: null,
+    exercises: {},
+    history: [],
+  };
+}
 
 export function dayKey(d = new Date()): string {
   // Use local calendar date so streaks/daily-goal are correct for non-UTC users (e.g. AEST UTC+10/+11).
@@ -73,11 +82,11 @@ function daysBetween(a: string, b: string): number {
 }
 
 export function loadProgress(): Progress {
-  if (typeof window === 'undefined') return { ...EMPTY };
+  if (typeof window === 'undefined') return emptyProgress();
   try {
     const raw = window.localStorage.getItem(KEY);
-    if (!raw) return { ...EMPTY };
-    const parsed = { ...EMPTY, ...(JSON.parse(raw) as Progress) };
+    if (!raw) return emptyProgress();
+    const parsed = { ...emptyProgress(), ...(JSON.parse(raw) as Progress) };
     // Defensive clamps against corrupt numeric fields.
     if (!isFinite(parsed.xp) || parsed.xp < 0) parsed.xp = 0;
     if (!isFinite(parsed.todayXp) || parsed.todayXp < 0) parsed.todayXp = 0;
@@ -111,7 +120,7 @@ export function loadProgress(): Progress {
     if (mutated) save(parsed);
     return parsed;
   } catch {
-    return { ...EMPTY };
+    return emptyProgress();
   }
 }
 
@@ -206,10 +215,8 @@ export function recordAttempt(input: RecordInput): {
 }
 
 export function resetProgress(): Progress {
-  return save({ ...EMPTY, todayDay: dayKey() });
+  return save({ ...emptyProgress(), todayDay: dayKey() });
 }
-
-export const dailyGoalXp = DAILY_GOAL_XP;
 
 // ─────────────────── Per-dimension history ───────────────────
 
@@ -313,7 +320,6 @@ export function levelFor(xp: number): {
 
 /**
  * Load the user-configurable daily rep goal (default 1, allowed 1|2|3).
- * Separate from DAILY_GOAL_XP which is kept for back-compat.
  */
 export function loadDailyGoalReps(): number {
   if (typeof window === 'undefined') return 1;
