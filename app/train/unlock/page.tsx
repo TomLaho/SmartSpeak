@@ -59,6 +59,8 @@ export default function UnlockPage() {
       router.replace('/train');
     } else if (res.reason === 'unavailable') {
       setMessage('In-app purchase is available in the SmartSpeak app on Google Play.');
+    } else if (res.reason === 'not-yet-available') {
+      setMessage("Pro isn't on sale yet — while we're in testing the full app is unlocked for you.");
     } else if (res.reason === 'error') {
       setMessage('Something went wrong with the purchase. Please try again.');
     }

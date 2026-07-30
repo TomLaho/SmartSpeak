@@ -75,6 +75,26 @@ async function getService(): Promise<any | null> {
 }
 
 /**
+ * Whether Play actually has PRODUCT_ID listed, independent of ownership:
+ * - 'available' — Play knows the product; the purchase flow can work.
+ * - 'absent' — Play answered and has no such product (e.g. unverified
+ *   payments profile). This is the ONLY state that grants the pre-launch
+ *   grace below — everything else fails closed, because an error must
+ *   never be the reason a user gets the paid tier for free.
+ * - 'unknown' — no getDetails, a non-array response, or a thrown error.
+ */
+async function productState(service: any): Promise<'available' | 'absent' | 'unknown'> {
+  try {
+    if (typeof service?.getDetails !== 'function') return 'unknown';
+    const details = await service.getDetails([PRODUCT_ID]);
+    if (!Array.isArray(details)) return 'unknown';
+    return details.length > 0 ? 'available' : 'absent';
+  } catch {
+    return 'unknown';
+  }
+}
+
+/**
  * Silent restore: ask Play whether this Google account already owns Pro and
  * refresh the cache. Resolves to the current entitlement (cached on failure).
  */
@@ -84,8 +104,20 @@ export async function refreshEntitlement(): Promise<boolean> {
     if (!service?.listPurchases) return readFlag();
     const purchases = await service.listPurchases();
     const owned = Array.isArray(purchases) && purchases.some((p: any) => p?.itemId === PRODUCT_ID);
-    writeFlag(owned);
-    return owned;
+    if (owned) {
+      writeFlag(true);
+      return true;
+    }
+    if ((await productState(service)) === 'absent') {
+      // Pre-launch grace: Play Billing is present but pro_unlock doesn't exist
+      // in the Play Console yet, so the purchase flow would reject every tap
+      // and lock testers out of the app entirely. Grant Pro until the product
+      // goes live — this reverts itself automatically the moment it does.
+      writeFlag(true);
+      return true;
+    }
+    writeFlag(false);
+    return false;
   } catch {
     return readFlag();
   }
@@ -109,7 +141,9 @@ export async function getProPrice(): Promise<string | null> {
   }
 }
 
-export type PurchaseResult = { ok: true } | { ok: false; reason: 'unavailable' | 'cancelled' | 'error' };
+export type PurchaseResult =
+  | { ok: true }
+  | { ok: false; reason: 'unavailable' | 'cancelled' | 'error' | 'not-yet-available' };
 
 /** Launch the Google Play purchase flow for the Pro unlock. */
 export async function purchasePro(): Promise<PurchaseResult> {
@@ -117,6 +151,8 @@ export async function purchasePro(): Promise<PurchaseResult> {
   try {
     const service = await getService();
     if (!service) return { ok: false, reason: 'unavailable' };
+    // Defence in depth: a tap can race the mount-time refreshEntitlement() call.
+    if ((await productState(service)) === 'absent') return { ok: false, reason: 'not-yet-available' };
 
     const methodData = [{ supportedMethods: PLAY_BILLING, data: { sku: PRODUCT_ID } }];
     const request = new PaymentRequest(methodData as any, {

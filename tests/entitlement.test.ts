@@ -3,12 +3,24 @@ import {
   canAccessExercise,
   canAccessFreePlay,
   isModuleUnlocked,
+  isProCached,
+  refreshEntitlement,
   FREE_EXERCISE_LIMIT,
   FREE_MODULE_LIMIT,
 } from '@/lib/entitlement';
 import { EXERCISES, MODULES, exercisesByModule, type ModuleId } from '@/lib/exercises';
+import { installStorage, removeStorage } from './helpers';
 
 afterEach(() => vi.useRealTimers());
+
+/** Installs a fake Play Billing service (and backing storage) for one test. */
+function installBillingService(service: {
+  listPurchases?: () => Promise<any>;
+  getDetails?: (ids: string[]) => Promise<any>;
+}): void {
+  installStorage();
+  (window as any).getDigitalGoodsService = async () => service;
+}
 
 describe('canAccessExercise', () => {
   it('lets a free user open exactly FREE_EXERCISE_LIMIT distinct exercises', () => {
@@ -87,5 +99,44 @@ describe('canAccessFreePlay', () => {
 
   it('is unlimited for Pro users', () => {
     expect(canAccessFreePlay({ pro: true, freePlayAttempts: 50, lastFreePlayDate: null })).toBe(true);
+  });
+});
+
+describe('refreshEntitlement', () => {
+  afterEach(() => removeStorage());
+
+  it('grants Pro when Play reports the purchase as owned', async () => {
+    installBillingService({ listPurchases: async () => [{ itemId: 'pro_unlock' }] });
+    await expect(refreshEntitlement()).resolves.toBe(true);
+  });
+
+  it('grants the pre-launch grace when the product does not exist in Play yet', async () => {
+    installBillingService({ listPurchases: async () => [], getDetails: async () => [] });
+    await expect(refreshEntitlement()).resolves.toBe(true);
+    expect(isProCached()).toBe(true);
+  });
+
+  it('still paywalls once the product is real but unowned', async () => {
+    installBillingService({
+      listPurchases: async () => [],
+      getDetails: async () => [{ itemId: 'pro_unlock', price: { value: '10.00', currency: 'USD' } }],
+    });
+    await expect(refreshEntitlement()).resolves.toBe(false);
+  });
+
+  it('fails closed when getDetails throws', async () => {
+    installBillingService({
+      listPurchases: async () => [],
+      getDetails: async () => {
+        throw new Error('network error');
+      },
+    });
+    await expect(refreshEntitlement()).resolves.toBe(false);
+    expect(isProCached()).toBe(false);
+  });
+
+  it('fails closed when getDetails returns a non-array', async () => {
+    installBillingService({ listPurchases: async () => [], getDetails: async () => undefined });
+    await expect(refreshEntitlement()).resolves.toBe(false);
   });
 });
