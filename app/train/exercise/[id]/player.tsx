@@ -76,6 +76,10 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
   // Attempt count for variation picking — read from localStorage on mount only,
   // so the server and first client render agree (avoids hydration mismatch).
   const [attemptCount, setAttemptCount] = useState(0);
+  // True only before the very first take on this device, when the one-time
+  // ~55 MB speech-model download still has to happen. Warn on the intro screen
+  // so a tester on mobile data expects the wait instead of reading it as a hang.
+  const [warnFirstDownload, setWarnFirstDownload] = useState(false);
 
   // Celebration + achievement queue state.
   const [celebrationShow, setCelebrationShow] = useState(false);
@@ -108,6 +112,16 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
   // Set on teardown so a committed take's queued `stop` handler still scores
   // the rep but skips the UI-only work whose cleanup is already gone.
   const unmountedRef = useRef(false);
+  // Screen wake lock, held for the duration of a take only. Android's screen
+  // timeout is commonly 30s while takes run 45–90s, and speaking to the phone
+  // without touching it never resets that timer — a screen-off mid-take can
+  // truncate the capture and score a rep the user never finished saying.
+  // Strictly best-effort: the API is absent on older WebViews and a refused
+  // request must never stop a recording from starting.
+  const wakeLockRef = useRef<any>(null);
+  // Whether a lock is currently wanted. `request()` resolves asynchronously, so
+  // a take that ends first must not leave a lock pinned on the results screen.
+  const wantWakeLockRef = useRef(false);
 
   /**
    * Point the results player at a take's audio, releasing the previous one.
@@ -133,7 +147,12 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
       const defaultDim = exercise.focus[0] ?? null;
       setChallenge(defaultDim);
     }
-    setAttemptCount(loadProgress().exercises[exercise.id]?.attempts ?? 0);
+    const progress = loadProgress();
+    setAttemptCount(progress.exercises[exercise.id]?.attempts ?? 0);
+    // No take anywhere yet ⇒ the model has never been fetched, so this rep pays
+    // the download. Any later rep finds it cached and needs no warning.
+    const anyTakeYet = Object.values(progress.exercises).some((e) => e.attempts > 0);
+    setWarnFirstDownload(!anyTakeYet && isOnDeviceTranscriptionSupported());
   }, [exercise]);
 
   // Advance achievement queue → currentAchievement one at a time.
@@ -145,7 +164,15 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     }
   }, [currentAchievement, achievementQueue]);
 
+  const releaseWakeLock = useCallback(() => {
+    wantWakeLockRef.current = false;
+    const lock = wakeLockRef.current;
+    wakeLockRef.current = null;
+    lock?.release?.().catch(() => {});
+  }, []);
+
   const cleanup = useCallback(() => {
+    releaseWakeLock();
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
     // Detach the recorder's handlers BEFORE the tracks stop — but only for a
@@ -169,7 +196,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     timerRef.current = null;
     audioCtxRef.current = null;
     streamRef.current = null;
-  }, []);
+  }, [releaseWakeLock]);
 
   useEffect(
     () => () => {
@@ -399,6 +426,17 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
 
       timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
       setPhase('recording');
+
+      // Keep the screen on for the take. Never awaited and never allowed to
+      // throw — if the lock resolves after the take already ended, drop it.
+      wantWakeLockRef.current = true;
+      (navigator as any).wakeLock
+        ?.request?.('screen')
+        .then((lock: any) => {
+          if (!wantWakeLockRef.current) lock?.release?.().catch(() => {});
+          else wakeLockRef.current = lock;
+        })
+        .catch(() => {});
     } catch (err: any) {
       console.error(err);
       const name = err?.name ?? '';
@@ -422,10 +460,11 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
     setLevel(0);
+    releaseWakeLock();
     recorderRef.current?.stop(); // triggers onstop → finishAnalysis
     streamRef.current?.getTracks().forEach((t) => t.stop());
     audioCtxRef.current?.close().catch(() => {});
-  }, []);
+  }, [releaseWakeLock]);
 
   const rescore = useCallback(() => {
     if (!exercise || !metrics) return;
@@ -505,6 +544,7 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
           }}
           activePrompt={activePrompt}
           isVariation={isVariation}
+          warnFirstDownload={warnFirstDownload}
         />
       )}
 
@@ -617,6 +657,7 @@ function IntroView({
   onChallengeChange,
   activePrompt,
   isVariation,
+  warnFirstDownload,
 }: {
   exercise: Exercise;
   onStart: () => void;
@@ -625,6 +666,7 @@ function IntroView({
   onChallengeChange: (dim: Dimension) => void;
   activePrompt: string | undefined;
   isVariation: boolean;
+  warnFirstDownload: boolean;
 }) {
   return (
     <div className="flex flex-1 flex-col">
@@ -729,6 +771,13 @@ function IntroView({
       </div>
 
       {error && <p className="mt-3 text-sm text-tier-red">{error}</p>}
+
+      {warnFirstDownload && (
+        <p className="mt-3 text-xs text-white/45">
+          Heads up: your first take downloads a one-time ~55 MB speech model so all coaching runs
+          privately on your phone. Best done on Wi-Fi — it&apos;s cached for every rep after this.
+        </p>
+      )}
 
       <Button onClick={onStart} size="lg" className="mt-4 h-14 w-full rounded-2xl bg-spotlight text-ink hover:bg-spotlight-soft text-base">
         Start recording

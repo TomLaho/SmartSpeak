@@ -117,7 +117,7 @@ export async function transcribeOnDevice(
 }
 
 /**
- * Best-effort pre-load of the Whisper pipeline (~40 MB, one-time). Called when
+ * Best-effort pre-load of the Whisper pipeline (~55 MB, one-time). Called when
  * a take starts so the model downloads DURING the recording instead of after
  * it. Safe to call repeatedly; does nothing where unsupported.
  */
