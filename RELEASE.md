@@ -1,5 +1,10 @@
 # Shipping SmartSpeak to the Google Play Store
 
+> **This file is the original planning doc and is now partly historical.**
+> For the live, step-by-step launch process see **`docs/PLAY-LAUNCH-PLAYBOOK.md`**,
+> and for current build state see **`docs/SESSION-HANDOFF-2026-07-26.md`**.
+> Kept for the cost model, the architecture rationale and the known limitations.
+
 SmartSpeak is a PWA. We publish it to Play as a **Trusted Web Activity (TWA)** —
 a thin Android wrapper around the deployed web app — and monetize with a single
 one-time **$10 in-app product** ("Pro") via **Google Play Billing**.

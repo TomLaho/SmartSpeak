@@ -16,7 +16,8 @@ Follow top to bottom. One action per step. Don't skip, don't reorder.
 | Upload signing key | ✅ Created — **you must back it up (Step 1)** |
 | Digital asset links (kills the URL bar) | ✅ Done — both upload key and Google's App-signing key are live |
 | Privacy policy URL in Play Console | ✅ Done |
-| `pro_unlock` in-app product | ❌ Not done (Step 10) |
+| **App pricing** | 🚨 **WRONG — app is set to PAID at $13.99. Blocks all testers. See PART 6.5.** |
+| `pro_unlock` in-app product | ⏸ **Deliberately not done — leave it until closed testing ends (Step 10).** While it doesn't exist, testers get the full curriculum free. |
 | Closed test (12 testers / 14 days) | ❌ Not started (Step 11) — **this is the long pole** |
 
 ### The honest timeline reality
@@ -34,7 +35,7 @@ Check which account type you have: Play Console → **Settings** (gear, bottom-l
 
 | File | Use it? |
 |---|---|
-| `C:\Users\lahog\Desktop\smartspeak-v3-app-release.aab` | ✅ **THIS ONE.** Version code 3 — verified mic + billing + new splash. Already on your Desktop. |
+| `C:\Users\lahog\Desktop\SmartSpeak-publish-v3.aab` | ✅ **THIS ONE.** versionCode 4 / 1.0.2 — mic + billing + splash + targetSdk 36. Already on your Desktop; the older bundle has been removed so there's only one. |
 | `C:\Users\lahog\ClaudeCode\SmartSpeak\android\app\build\outputs\bundle\release\app-release.aab` | ✅ Same file, at its build location. |
 
 > The Android wrapper project now lives at `SmartSpeak\android\` (moved from `ClaudeCode\smartspeak-twa\`). It is git-ignored in full because it contains your keystore and its password — **never force-add anything under `android/` to git.**
@@ -49,22 +50,54 @@ This file is your app's identity. Lose it and you can never update SmartSpeak ag
 
 1. Open File Explorer, paste this into the address bar and press Enter:
    ```
-   C:\Users\lahog\ClaudeCode\smartspeak-twa
+   C:\Users\lahog\ClaudeCode\SmartSpeak\android
    ```
 2. Find the file **`smartspeak-upload.keystore`**. Right-click → **Copy**.
 3. Paste it into **two** places that aren't this computer's hard drive — e.g. your Google Drive folder AND a USB stick. (Two, not one.)
 4. Open your password manager. Create a new entry:
    - **Title:** SmartSpeak Android upload key
-   - **Password:** `SmartSpeak2024!`
-   - **Notes:** `Alias: smartspeak | Store password AND key password are both SmartSpeak2024! | Keystore file backed up in <wherever you put it>`
+   - **Password:** the store/key password (both are the same). It is in `android/app/build.gradle` under `signingConfigs.release` on your machine — copy it from there, and **do not paste it into any file in this repo.**
+   - **Notes:** `Alias: smartspeak | Store password AND key password are identical | Keystore file backed up in <wherever you put it>`
 5. ✅ **Done when:** the keystore file exists in two non-local places and the password is in your password manager.
+
+> ### 🔴 Read Step 1b before you consider Step 1 finished.
+
+### ☐ Step 1b — Rotate the upload key (this repo is public and the password leaked)
+
+The password was written into this playbook and into the session handoff on 26/07 and pushed to
+**`github.com/TomLaho/SmartSpeak`, which is a public repository.** It has been removed from the current
+files, but **git keeps history** — anyone can still read it in commit `2407158`. Treat it as compromised.
+
+**How bad is it, honestly:** limited. The keystore *file* was never committed — `.gitignore` caught it
+(verified across all history). A password with no keystore signs nothing. But your defence-in-depth is
+gone, and the same keystore is backed up in Google Drive, so a Drive leak would now be enough on its own.
+
+1. ☐ Decide: rotate, or accept. Rotating is the safe call and Google supports it explicitly — Play App
+   Signing means **your upload key is replaceable without losing the app**. The app-signing key that
+   users actually verify against is held by Google and is unaffected either way.
+2. ☐ If rotating: Play Console → **Test and release** → **Setup** → **App integrity** → **App signing**
+   tab → **Request upload key reset**. Generate a fresh keystore with a new password, upload the new
+   certificate, and follow Google's instructions.
+3. ☐ Update `public/.well-known/assetlinks.json` with the new upload-key SHA-256 (keep Google's
+   app-signing fingerprint `A9:9C:E7:…:1E` in place), then push — otherwise the TWA shows a browser
+   address bar.
+4. ☐ Put the new password **only** in your password manager. Never in a repo file.
+5. ✅ **Done when:** Play Console shows the new upload certificate and a fresh build signed with the new
+   key uploads without an "incorrect certificate" error.
+
+> **Not urgent enough to delay testers.** The password alone is not exploitable, so start closed testing
+> first (PART 6) and do this during the 14 days. Just don't skip it.
 
 > The old PWABuilder key is dead. Nothing was ever uploaded with it, so it doesn't matter. Ignore it.
 
 ### ☐ Step 2 — Find the .aab (already done for you)
 
-1. Look on your **Desktop** for **`smartspeak-v3-app-release.aab`** (2.4 MB).
+1. Look on your **Desktop** for **`SmartSpeak-publish-v3.aab`** (versionCode 4 / 1.0.2).
 2. ✅ **Done when:** you can see that file. It's already there — nothing to copy.
+
+> **You do not need to rebuild it.** SmartSpeak is a TWA: the bundle is a shell around the live website,
+> so all the code fixes from 29–30/07 reach testers through the Netlify deploy, not through a new upload.
+> This bundle stays valid until something *native* changes (permissions, icons, splash, SDK levels).
 
 ---
 
@@ -78,7 +111,7 @@ Open https://play.google.com/console in Chrome and sign in. Select the **SmartSp
 
 1. Left sidebar → **Test and release** → **Testing** → **Internal testing**.
 2. Top-right → blue **Create new release** button.
-3. You'll see a box labelled **App bundles**. Drag `smartspeak-v3-app-release.aab` from your Desktop into it. Wait for the upload bar to finish (~30 seconds).
+3. You'll see a box labelled **App bundles**. Drag `SmartSpeak-publish-v3.aab` from your Desktop into it. Wait for the upload bar to finish (~30 seconds).
 4. If a dialog appears offering **Play App Signing** / "Use Google-generated key" → click **Continue** / **Accept**. This is correct and required.
 5. Scroll down to **Release notes**. In the box, paste:
    ```
@@ -223,6 +256,21 @@ Skip any field marked optional. Speed over polish — you can edit all of this l
 >
 > **Do not let this block Step 11.** The closed test does not need `pro_unlock` to exist. Start the 14-day clock first, sort monetisation during those two weeks.
 
+> ### ⚠️ Do NOT activate `pro_unlock` until the 14-day closed test has finished.
+>
+> The app asks Google Play at runtime whether `pro_unlock` exists. While it **doesn't** exist, the
+> app unlocks the whole curriculum for free — that's deliberate, so your testers can actually reach
+> all 25 exercises and give you useful feedback instead of hitting a paywall after 3 reps that they
+> physically cannot pay.
+>
+> The moment you set `pro_unlock` to **Active**, that ends: the paywall switches itself on for
+> everyone, and your testers drop back to 3 free reps mid-test. **No code change is needed either
+> way — Play's own state is the switch.**
+>
+> So: create the payments profile now if you like (10b), but **come back and do steps 1–6 below only
+> after closed testing is done**, or right before you go to production (Step 12). Nothing else in the
+> launch depends on it.
+
 1. Left sidebar → **Monetise** → **Products** → **In-app products**.
 2. Top-right → **Create product**.
 3. Fill in:
@@ -247,7 +295,15 @@ Skip any field marked optional. Speed over polish — you can edit all of this l
 2. Click **Create track** (name it `Closed test`) → then **Create new release**.
 3. Under **App bundles**, click **Add from library** → select the same build you uploaded in Step 3. (Don't re-upload the file.)
 4. Add release notes → **Next** → **Save and publish**.
-5. **Testers** tab → **Create email list** → name it `Closed testers` → add **12+ Google account email addresses** (use 14–15 for safety margin in case someone drops out). See **Step 11b** if you don't have 12 people.
+5. **Testers** tab → add **12+ Google account email addresses**. Use 14–15 for safety margin in case someone drops out. See **Step 11b** if you don't have 12 people.
+
+   > **Yes — testers must be added manually. Only listed accounts can install a closed test.** Enrolling via the link isn't enough on its own; the account has to be on your list first. Two ways to manage that:
+   >
+   > | Method | When to use |
+   > |---|---|
+   > | **Email list** (Create email list) | Fine for a handful. You paste each address and re-save every time someone joins. |
+   > | **Google Group** ✅ recommended for 12+ | Create a public group at [groups.google.com](https://groups.google.com), add the group address as your tester list once, then people **join the group themselves**. No Console edits as testers trickle in — a big deal when you're swapping with strangers from Reddit. |
+
 6. **Save changes**, tick the list, **Save changes**.
 7. Copy the opt-in link and send it to all 12 people. It looks like this:
    ```
@@ -315,6 +371,66 @@ I can't verify specific Telegram channels are currently active, safe, or not sca
 3. Review takes anywhere from a few hours to 7 days for a first submission.
 
 ---
+
+---
+
+## PART 6.5 — 🚨 YOUR APP IS CONFIGURED AS A PAID APP. FIX THIS FIRST.
+
+Your store listing shows **"$13.99 Buy"** instead of "Install". That single setting explains every symptom you're seeing, and it contradicts the whole product design.
+
+### What's actually wrong
+
+SmartSpeak was built as a **free app with a $10 in-app purchase** (`pro_unlock`): 3 free reps, then pay to unlock the rest. That logic is in `lib/entitlement.ts` and it's the model the whole app is designed around.
+
+But in Play Console the **app itself** is priced at $13.99. So right now:
+
+- Nobody can install it without paying $13.99 up front.
+- The free preview is unreachable — there is no free tier at all.
+- If you later activate `pro_unlock`, you'd be charging **$13.99 + $10** for the same thing.
+
+### Why each symptom happens
+
+| What you saw | Cause |
+|---|---|
+| Brother sees a **$13.99 Buy** button, not Install | The app is paid |
+| Brother is "**You are a tester**" but nothing installs | [Closed-test testers of a **paid** app must still buy it](https://support.google.com/googleplay/android-developer/answer/9845334) — enrolling doesn't waive the price |
+| **"Price is out of date"** error on purchase | Play Store client-side cache glitch. Real, but irrelevant — it's failing on a purchase that shouldn't exist |
+| **It works fine for you** | You're the developer account — you get your own app without paying |
+
+### ☐ Step A — Get your brother unblocked in the next 5 minutes (no permanent change)
+
+[Testers of a paid app **can** install free via **internal** testing](https://support.google.com/googleplay/android-developer/answer/9845334) — that's the exception. So:
+
+1. ☐ Play Console → **Test and release** → **Testing** → **Internal testing** → **Testers** tab.
+2. ☐ Add your brother's Google account email to the internal tester list → **Save changes**.
+3. ☐ Send him the **internal testing** opt-in link from that same page (not the closed-testing one).
+4. ☐ He opens it → **Become a tester** → **Download it on Google Play**.
+5. ✅ **Done when:** it installs with no payment prompt.
+
+> Have him force-stop the Play Store first (Settings → Apps → Google Play Store → Force stop) to clear that "Price is out of date" cache.
+
+### ☐ Step B — Set the app to Free (the actual fix)
+
+> ### ⚠️ THIS IS PERMANENT AND CANNOT BE UNDONE.
+> [Once an app has been offered for free, it can never be changed back to paid](https://support.google.com/googleplay/android-developer/answer/6334373). The only way back would be publishing a brand-new app under a different package name, losing your listing, reviews and testers.
+>
+> **In your case this is exactly what you want** — free + in-app purchase was always the plan. But read the sentence above twice before you click, because there is no second chance.
+
+1. ☐ Play Console → **Monetise** → **App pricing**.
+2. ☐ Click **Set as free** (or **Change to free**).
+3. ☐ Read Google's confirmation dialog. It will tell you this is irreversible. Confirm.
+4. ☐ Wait up to a few hours for the listing to update — the "Buy" button won't disappear instantly.
+5. ✅ **Done when:** the store page shows **Install** instead of a price.
+
+**You do not need a payments profile for this.** Free apps don't require a merchant account — so this step is *not* blocked by the thing that blocked `pro_unlock` in Step 10.
+
+### After it's free
+
+- Testers install normally, and closed testing works as documented in Step 11.
+- Your revenue comes from `pro_unlock` at $10 once the payments profile is verified (Step 10).
+- Nothing in the app code needs to change — `lib/entitlement.ts` already assumes free + IAP.
+
+> **Where did $13.99 come from?** Probably an auto-converted USD price from an AUD figure, or a default set during onboarding. Either way it's about to be irrelevant.
 
 ---
 
