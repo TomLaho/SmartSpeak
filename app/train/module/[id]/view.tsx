@@ -4,6 +4,12 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
+  ChevronLeftIcon,
+  CheckIcon,
+  LockClosedIcon,
+  StarIcon,
+} from '@heroicons/react/24/outline';
+import {
   getModule,
   exercisesByModule,
   FREE_PLAY_ID,
@@ -98,8 +104,12 @@ export default function ModulePage({ params }: { params: { id: string } }) {
     <div className="flex min-h-[100dvh] flex-col px-5 pb-8 pt-5">
       {/* Back link */}
       <div className="mb-6">
-        <Link href="/train" className="text-sm text-white/50 hover:text-white">
-          ‹ Back
+        <Link
+          href="/train"
+          className="flex w-fit items-center gap-1 text-sm text-white/50 transition-colors hover:text-white"
+        >
+          <ChevronLeftIcon className="h-4 w-4" />
+          Back
         </Link>
       </div>
 
@@ -141,9 +151,17 @@ export default function ModulePage({ params }: { params: { id: string } }) {
             >
               {statusLabel}
             </p>
-            <p className="text-xs text-white/40">
-              {mp.completedCount} of {mp.total} done
-              {mp.masteredCount > 0 && ` · ${mp.masteredCount} ✦`}
+            <p className="flex items-center gap-1 text-xs text-white/40">
+              <span className="tabular-nums">
+                {mp.completedCount} of {mp.total} done
+              </span>
+              {mp.masteredCount > 0 && (
+                <>
+                  <span className="text-white/25">·</span>
+                  <StarIcon className="h-3.5 w-3.5 text-spotlight" />
+                  <span className="tabular-nums">{mp.masteredCount}</span>
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -230,20 +248,20 @@ function PathNode({
   if (state === 'mastered') {
     return (
       <div
-        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-lg font-bold text-ink"
+        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-ink"
         style={{ backgroundColor: '#FFC857' }}
       >
-        ✦
+        <StarIcon className="h-6 w-6 stroke-[2.5]" />
       </div>
     );
   }
   if (state === 'done') {
     return (
       <div
-        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-lg font-bold text-ink"
+        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-ink"
         style={{ backgroundColor: accent }}
       >
-        ✓
+        <CheckIcon className="h-6 w-6 stroke-[3]" />
       </div>
     );
   }
@@ -263,8 +281,8 @@ function PathNode({
   }
   if (state === 'locked') {
     return (
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-base text-white/30">
-        🔒
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-white/30">
+        <LockClosedIcon className="h-5 w-5" />
       </div>
     );
   }

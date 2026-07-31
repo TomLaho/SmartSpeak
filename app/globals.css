@@ -33,10 +33,60 @@ body {
   @apply bg-background text-foreground font-sans;
 }
 
-input, textarea {
+@layer base {
+  /**
+   * Display typography.
+   *
+   * Headings at default web tracking and 1.5 leading read like a document, not
+   * a product. Tightening to -2%/-3% and pulling the leading down to 110–120%
+   * is what makes large type look set rather than typed. Tailwind's own
+   * `tracking-*` / `leading-*` utilities still win on specificity, so the
+   * uppercase micro-labels that need positive tracking keep their own values.
+   */
+  h1 {
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+  }
+
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
+    line-height: 1.18;
+  }
+
+  /* Numerals in the same run should never jitter as they count up. */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+input,
+textarea {
   @apply outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2;
 }
 
 .prose p {
   @apply leading-relaxed;
+}
+
+/**
+ * Focus is a signifier, not decoration: on the dark trainer surfaces the shared
+ * `--ring` (a light slate) all but disappears, so keyboard users lose their
+ * place. Scope a gold ring to the app shell instead of overriding the token
+ * globally, which the light marketing pages still rely on.
+ */
+.dark-surface :focus-visible {
+  outline: 2px solid #ffc857;
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

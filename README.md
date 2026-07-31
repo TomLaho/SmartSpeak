@@ -31,10 +31,12 @@ The trainer is a standalone, installable PWA, which is the recommended on-ramp t
 ## Project structure
 - `app/train/` the PWA trainer (home path, exercise player, progress, profile, unlock)
 - `app/` landing page, manifest, icons, privacy & terms
-- `components/train/` trainer UI (tab bar, score rings, level bar, achievements, etc.)
+- `components/train/` trainer UI (tab bar, score rings, level bar, achievements, onboarding, setup checklist, activity strip)
 - `components/ui/` shadcn-inspired UI primitives
 - `components/brand/logo.tsx` the in-app brand mark (matches the installed app icon)
 - `lib/exercises.ts` the exercise curriculum (Delivery, Structure, Influence & Q&A paths)
+- `lib/personalise.ts` the work moment the user picks in first-run; drives the up-next reason + goal module
+- `lib/setup.ts` the first-week setup checklist (pure state, tested)
 - `lib/audio-analysis.ts` on-device Web Audio analysis (pace, pauses, energy, pitch)
 - `lib/transcribe.ts` / `lib/transcribe.worker.ts` on-device Whisper transcription (self-hosted model)
 - `lib/coach.ts` deterministic, on-device delivery + structure/content scoring
@@ -55,7 +57,8 @@ pnpm lint        # next lint
 
 `pnpm test:watch` reruns on change. The suite covers the modules where being
 wrong is expensive and behaviour is deterministic: the progress/streak store,
-entitlement gates, coach scoring, achievements and next-rep selection. Browser
+entitlement gates, coach scoring, achievements, next-rep selection and the
+setup checklist. Browser
 surfaces (recording, transcription, Play Billing) are validated with `pnpm dev`
 and a real device — they can't be meaningfully unit-tested without mocking away
 the thing under test.

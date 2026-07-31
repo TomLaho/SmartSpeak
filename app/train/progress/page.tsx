@@ -2,6 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import {
+  LockClosedIcon,
+  ArrowUpRightIcon,
+  ArrowDownRightIcon,
+  ChevronRightIcon,
+} from '@heroicons/react/24/outline';
 import { DIMENSION_LABELS, BENCHMARKS, getExercise, type Dimension } from '@/lib/exercises';
 import {
   loadProgress,
@@ -13,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { Ring } from '@/components/train/ring';
 import { LevelBar } from '@/components/train/level-bar';
 import { Sparkline } from '@/components/train/sparkline';
+import { ActivityStrip } from '@/components/train/activity-strip';
 
 const MEASURABLE_DIMS: Dimension[] = [
   'pace',
@@ -26,6 +33,9 @@ const MEASURABLE_DIMS: Dimension[] = [
   'concreteness',
 ];
 
+/** Recent window size for the headline average and its comparison period. */
+const WINDOW = 6;
+
 export default function ProgressPage() {
   const [progress, setProgress] = useState<Progress | null>(null);
   const [unlockedAchievements, setUnlockedAchievements] = useState<Achievement[]>([]);
@@ -38,9 +48,20 @@ export default function ProgressPage() {
     setUnlockedIds(loadUnlockedIds());
   }, []);
 
+  const history = progress?.history ?? [];
+  const recent = history.slice(0, 12);
+  const avg = (xs: number[]) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : 0);
+
+  // Headline average over the last WINDOW takes, compared with the WINDOW
+  // before it — an average with no direction attached says nothing about
+  // whether the training is working.
+  const currentWindow = history.slice(0, WINDOW).map((h) => h.score);
+  const priorWindow = history.slice(WINDOW, WINDOW * 2).map((h) => h.score);
+  const avgScore = avg(currentWindow);
+  const delta = priorWindow.length >= 2 ? avgScore - avg(priorWindow) : null;
+
+  const bestScore = history.length ? Math.max(...history.map((h) => h.score)) : 0;
   const completed = progress ? Object.values(progress.exercises).filter((e) => e.attempts > 0).length : 0;
-  const recent = progress?.history.slice(0, 12) ?? [];
-  const avgScore = recent.length ? Math.round(recent.reduce((a, h) => a + h.score, 0) / recent.length) : 0;
 
   // Dimensions with at least 2 data points
   const trendDims = MEASURABLE_DIMS.filter((dim) => {
@@ -53,27 +74,43 @@ export default function ProgressPage() {
       <h1 className="mb-4 text-2xl font-bold">Your progress</h1>
 
       {/* Level bar */}
-      <div className="mb-5 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+      <div className="mb-4 rounded-2xl border border-hairline bg-surface-1 px-4 py-3">
         <LevelBar xp={progress?.xp ?? 0} />
       </div>
 
-      {/* Stats grid */}
-      <div className="mb-6 grid grid-cols-3 gap-3">
-        <Tile value={(progress?.streak ?? 0).toString()} label="Day streak" emoji="🔥" />
-        <Tile value={(progress?.xp ?? 0).toLocaleString()} label="Total XP" emoji="⚡" />
-        <Tile value={completed.toString()} label="Exercises done" emoji="✅" />
-      </div>
+      {/* Habit, as a shape rather than a number */}
+      <ActivityStrip history={history} className="mb-4" />
 
-      {/* Recent average score ring */}
-      <div className="mb-6 flex items-center gap-5 rounded-3xl border border-white/10 bg-white/[0.05] p-5">
-        <Ring value={avgScore} size={92} stroke={9} color="#FFC857">
-          <span className="text-xl font-bold">{avgScore || '—'}</span>
-        </Ring>
-        <div>
-          <p className="font-semibold">Recent average score</p>
-          <p className="mt-0.5 text-sm text-white/55">
-            {recent.length ? `Across your last ${recent.length} takes.` : 'Complete a take to see your average.'}
-          </p>
+      {/* Headline: average with direction, paired with the supporting numbers.
+          Two columns of different things beats a row of identical KPI cards. */}
+      <div className="mb-6 grid grid-cols-2 gap-3">
+        <div className="flex flex-col items-center justify-center rounded-3xl border border-hairline bg-surface-2 p-4">
+          <Ring value={avgScore} size={86} stroke={9} color="#FFC857">
+            <span className="text-xl font-bold tabular-nums">{avgScore || '—'}</span>
+          </Ring>
+          <p className="mt-2.5 text-center text-xs font-semibold text-white/70">Recent average</p>
+          {delta === null ? (
+            <p className="mt-0.5 text-center text-[11px] text-white/35">
+              {recent.length ? `Last ${currentWindow.length} takes` : 'No takes yet'}
+            </p>
+          ) : (
+            <p
+              className={cn(
+                'mt-0.5 flex items-center gap-0.5 text-[11px] font-semibold tabular-nums',
+                delta > 0 ? 'text-stage' : delta < 0 ? 'text-tier-amber' : 'text-white/40'
+              )}
+            >
+              {delta > 0 && <ArrowUpRightIcon className="h-3 w-3" />}
+              {delta < 0 && <ArrowDownRightIcon className="h-3 w-3" />}
+              {delta === 0 ? 'Holding steady' : `${delta > 0 ? '+' : ''}${delta} vs previous`}
+            </p>
+          )}
+        </div>
+
+        <div className="grid grid-rows-3 gap-3">
+          <MiniStat value={(progress?.streak ?? 0).toString()} label="Day streak" />
+          <MiniStat value={bestScore ? bestScore.toString() : '—'} label="Best score" />
+          <MiniStat value={completed.toString()} label="Exercises done" />
         </div>
       </div>
 
@@ -85,16 +122,31 @@ export default function ProgressPage() {
             {trendDims.map((dim) => {
               const values = progress ? dimensionTrend(progress, dim) : [];
               const last = values[values.length - 1] ?? 0;
+              const first = values[0] ?? 0;
+              const dimDelta = values.length >= 2 ? last - first : 0;
               const benchmark = BENCHMARKS[dim];
               return (
                 <div
                   key={dim}
-                  className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3"
+                  className="flex items-center gap-3 rounded-2xl border border-hairline bg-surface-1 px-4 py-3"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-semibold">{DIMENSION_LABELS[dim]}</p>
-                      <span className="shrink-0 text-sm font-bold text-spotlight tabular-nums">{last}</span>
+                      <span className="flex shrink-0 items-center gap-1.5">
+                        {dimDelta !== 0 && (
+                          <span
+                            className={cn(
+                              'text-[10px] font-semibold tabular-nums',
+                              dimDelta > 0 ? 'text-stage' : 'text-white/30'
+                            )}
+                          >
+                            {dimDelta > 0 ? '+' : ''}
+                            {dimDelta}
+                          </span>
+                        )}
+                        <span className="text-sm font-bold text-spotlight tabular-nums">{last}</span>
+                      </span>
                     </div>
                     <p className="mt-0.5 text-[11px] text-white/35">Target: {benchmark.target}</p>
                   </div>
@@ -107,7 +159,12 @@ export default function ProgressPage() {
       )}
 
       {/* Achievements grid */}
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-white/40">Achievements</h2>
+      <div className="mb-3 flex items-baseline justify-between">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-white/40">Achievements</h2>
+        <span className="text-xs text-white/35 tabular-nums">
+          {unlockedAchievements.length}/{ACHIEVEMENTS.length}
+        </span>
+      </div>
       <div className="mb-6 grid grid-cols-2 gap-2">
         {ACHIEVEMENTS.map((a) => {
           const earned = unlockedIds.has(a.id);
@@ -116,12 +173,16 @@ export default function ProgressPage() {
               key={a.id}
               className={cn(
                 'flex items-center gap-3 rounded-2xl border p-3.5',
-                earned
-                  ? 'border-spotlight/30 bg-spotlight/10'
-                  : 'border-white/8 bg-white/[0.03] opacity-60'
+                earned ? 'border-spotlight/30 bg-spotlight/10' : 'border-hairline bg-surface-1 opacity-60'
               )}
             >
-              <span className="text-2xl">{earned ? a.emoji : '🔒'}</span>
+              {earned ? (
+                <span className="text-2xl">{a.emoji}</span>
+              ) : (
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/[0.06]">
+                  <LockClosedIcon className="h-4 w-4 text-white/35" />
+                </span>
+              )}
               <div className="min-w-0">
                 <p className={cn('text-sm font-semibold leading-tight', earned ? 'text-white' : 'text-white/50')}>
                   {a.name}
@@ -136,11 +197,12 @@ export default function ProgressPage() {
       {/* Recent takes */}
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-white/40">Recent takes</h2>
       {recent.length === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 text-center text-sm text-white/50">
+        <div className="rounded-2xl border border-hairline bg-surface-1 p-6 text-center text-sm text-white/50">
           No takes yet.
           <div className="mt-3">
-            <Link href="/train" className="font-semibold text-spotlight">
-              Start your first exercise →
+            <Link href="/train" className="inline-flex items-center gap-1 font-semibold text-spotlight">
+              Start your first exercise
+              <ChevronRightIcon className="h-4 w-4" />
             </Link>
           </div>
         </div>
@@ -150,7 +212,7 @@ export default function ProgressPage() {
             const ex = getExercise(h.exerciseId);
             const color = h.score >= 80 ? '#4ade80' : h.score >= 60 ? '#FFC857' : '#f87171';
             return (
-              <div key={h.id} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+              <div key={h.id} className="flex items-center gap-3 rounded-2xl border border-hairline bg-surface-1 p-3">
                 <span className="text-xl">{ex?.emoji ?? '🎤'}</span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{ex?.title ?? 'Exercise'}</p>
@@ -170,12 +232,11 @@ export default function ProgressPage() {
   );
 }
 
-function Tile({ value, label, emoji }: { value: string; label: string; emoji: string }) {
+function MiniStat({ value, label }: { value: string; label: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-center">
-      <div className="text-xl">{emoji}</div>
-      <p className="mt-1 text-xl font-bold leading-none">{value}</p>
-      <p className="mt-1 text-[11px] text-white/45">{label}</p>
+    <div className="flex items-center justify-between rounded-2xl border border-hairline bg-surface-1 px-3.5">
+      <p className="text-[11px] text-white/45">{label}</p>
+      <p className="text-lg font-bold leading-none tabular-nums tracking-display">{value}</p>
     </div>
   );
 }

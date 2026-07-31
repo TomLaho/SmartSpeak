@@ -10,8 +10,11 @@ import { TabBar } from '@/components/train/tab-bar';
  */
 export default function TrainLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-[100dvh] bg-ink text-white">
-      <div className="mx-auto flex min-h-[100dvh] max-w-md flex-col bg-gradient-to-b from-ink-800 via-ink to-ink shadow-2xl sm:my-0 relative overflow-hidden">
+    <div className="dark-surface min-h-[100dvh] bg-ink text-white">
+      {/* No drop shadow on the column: on a dark canvas a shadow is invisible
+          and buys nothing. Elevation here is expressed as lightness — see the
+          `surface-1/2/3` tokens. */}
+      <div className="mx-auto flex min-h-[100dvh] max-w-md flex-col bg-gradient-to-b from-ink-800 via-ink to-ink sm:my-0 relative overflow-hidden">
         {/* Spotlight glow — warm gold radial emanating from top */}
         <div
           className="pointer-events-none absolute inset-x-0 top-0 h-64 z-0"

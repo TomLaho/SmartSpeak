@@ -73,6 +73,26 @@ const config: Config = {
           amber: '#FFB454',
           red: '#FF6B6B',
         },
+        // ── Dark-mode elevation ──
+        // Depth on a dark surface comes from *lightness*, not shadow: each step
+        // up the stack is a slightly lighter translucent white over the ink
+        // background. Three rungs is enough for a phone UI — more reads as noise.
+        surface: {
+          1: 'rgba(255,255,255,0.04)',
+          2: 'rgba(255,255,255,0.065)',
+          3: 'rgba(255,255,255,0.10)',
+        },
+        hairline: 'rgba(255,255,255,0.10)',
+      },
+      // Large text tightens up: -2%/-3% tracking with 110–120% leading is the
+      // difference between "default web page" and "designed product".
+      letterSpacing: {
+        display: '-0.02em',
+        'display-tight': '-0.03em',
+      },
+      lineHeight: {
+        display: '1.1',
+        'display-relaxed': '1.18',
       },
       borderRadius: {
         lg: 'var(--radius)',
@@ -80,8 +100,8 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
       },
       fontFamily: {
-        sans: ['Inter', ...fontFamily.sans],
-        display: ['Inter', ...fontFamily.sans],
+        sans: ['var(--font-sans)', 'Inter', ...fontFamily.sans],
+        display: ['var(--font-sans)', 'Inter', ...fontFamily.sans],
       },
       keyframes: {
         'accordion-down': {
@@ -108,6 +128,13 @@ const config: Config = {
           from: { opacity: '1', transform: 'translateY(0) rotate(0deg)' },
           to: { opacity: '0', transform: 'translateY(80px) rotate(720deg)' },
         },
+        // Transient confirmation chip: slides up, holds, fades out. One
+        // animation rather than a timer-driven mount/unmount pair.
+        'chip-confirm': {
+          '0%': { opacity: '0', transform: 'translateY(8px)' },
+          '15%, 75%': { opacity: '1', transform: 'translateY(0)' },
+          '100%': { opacity: '0', transform: 'translateY(-4px)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -116,6 +143,7 @@ const config: Config = {
         pop: 'pop 0.35s cubic-bezier(0.34,1.56,0.64,1)',
         shimmer: 'shimmer 2s linear infinite',
         confetti: 'confetti-fall 0.9s ease-out forwards',
+        'chip-confirm': 'chip-confirm 1.6s ease-out forwards',
       },
     },
   },

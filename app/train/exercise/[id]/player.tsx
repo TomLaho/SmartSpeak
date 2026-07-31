@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
 import {
   EXERCISES,
   getExercise,
@@ -524,8 +525,13 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     <div className="flex min-h-[100dvh] flex-col px-5 pb-8 pt-5">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
-        <Link href="/train" className="text-sm text-white/50 hover:text-white" onClick={cleanup}>
-          ✕ Close
+        <Link
+          href="/train"
+          className="flex items-center gap-1.5 text-sm text-white/50 transition-colors hover:text-white"
+          onClick={cleanup}
+        >
+          <XMarkIcon className="h-4 w-4" />
+          Close
         </Link>
         <span className="rounded-full bg-white/[0.06] px-3 py-1 text-xs text-white/60">
           {exercise.emoji} {exercise.title}
@@ -915,6 +921,10 @@ function ResultsView({
   onAchievementDone: () => void;
   freePreview: { left: number; justUsedLast: boolean } | null;
 }) {
+  // Timestamp of the last re-score, used purely as an animation key so tapping
+  // twice replays the confirmation instead of leaving a stale chip on screen.
+  const [rescoredAt, setRescoredAt] = useState(0);
+
   // Score ring color by tier.
   const scoreColor =
     result.overallScore >= 80 ? '#3DD68C' : result.overallScore >= 60 ? '#FFC857' : '#FFB454';
@@ -1111,14 +1121,32 @@ function ResultsView({
               placeholder="No words captured — type what you said for structure & content feedback."
               className="w-full rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm text-white/80 placeholder:text-white/25"
             />
-            <Button
-              onClick={onRescore}
-              variant="secondary"
-              size="sm"
-              className="mt-2 border border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
-            >
-              Re-score
-            </Button>
+            {/* Re-scoring rewrites numbers further up the page, well outside
+                the viewport — without an acknowledgement at the point of the
+                tap it reads as a dead button. */}
+            <div className="mt-2 flex items-center gap-2">
+              <Button
+                onClick={() => {
+                  onRescore();
+                  setRescoredAt(Date.now());
+                }}
+                variant="secondary"
+                size="sm"
+                className="border border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+              >
+                Re-score
+              </Button>
+              {rescoredAt > 0 && (
+                <span
+                  key={rescoredAt}
+                  role="status"
+                  className="flex animate-chip-confirm items-center gap-1 rounded-full bg-stage/15 px-2.5 py-1 text-xs font-semibold text-stage"
+                >
+                  <CheckIcon className="h-3.5 w-3.5 stroke-[3]" />
+                  Scores updated
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Free-preview footnote (skipped on the take that shows the hero card) */}

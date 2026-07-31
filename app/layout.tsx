@@ -1,8 +1,25 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
+import { Inter } from 'next/font/google';
 import { siteConfig } from '@/lib/site';
 import { cn } from '@/lib/utils';
 import { SwRegister } from '@/components/sw-register';
+
+/**
+ * One typeface, self-hosted.
+ *
+ * The Tailwind stack has always named Inter but nothing ever loaded it, so the
+ * app silently rendered in whatever the platform's default sans was — Roboto on
+ * Android, Segoe on Windows — which is exactly the inconsistency a single
+ * high-quality sans is meant to remove. `next/font` downloads and emits the
+ * files at build time under our own origin, so there is no runtime request to
+ * Google and the PWA still works fully offline.
+ */
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-sans',
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://smartspeak-app.netlify.app'),
@@ -57,7 +74,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   // Pure on-device PWA: no auth provider, no backend, no environment variables.
   return (
-    <html lang="en">
+    <html lang="en" className={inter.variable}>
       <body className={cn('min-h-screen bg-background text-foreground antialiased')}>
         <SwRegister />
         {children}
