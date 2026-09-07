@@ -76,6 +76,8 @@ Two emails from Play, both with a **31 Aug 2026** deadline.
 
 **1. Target API level — FIXED.** Play requires API 36 (Android 16) for all updates from 31/08/2026 ([source](https://support.google.com/googleplay/android-developer/answer/11926878)). Bumped `targetSdkVersion` 35 → 36. This forced `androidbrowserhelper` 2.6.2 → 2.7.2 (for API 36 behaviour support), which in turn forced `minSdkVersion` 21 → 23 — 2.7.x declares minSdk 23 and the manifest merger refuses the mismatch. Android 5.x is long dead and a TWA needs a modern Chrome anyway, so the coverage cost is negligible.
 
+**2. Play Billing Library ≥ 8.0.0 — ✅ RESOLVED 08/09/2026.** `com.google.androidbrowserhelper:billing:1.2.0` shipped after this was written; its POM declares `com.android.billingclient:billing:8.3.0`, so the requirement is met transitively and no fallback was needed. `android/app/build.gradle` pins the helper at 1.2.0 and pins no billingclient version. Google also moved the deadline from 31/08/2026 to **01/11/2026**. The analysis below is kept for context and is no longer actionable.
+
 **2. Play Billing Library ≥ 8.0.0 — BLOCKED UPSTREAM, deliberately deferred.**
 
 This one cannot currently be fixed. The chain:

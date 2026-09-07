@@ -135,12 +135,15 @@ gone, and the same keystore is backed up in Google Drive, so a Drive leak would 
 
 ### ☐ Step 2 — Find the .aab (already done for you)
 
-1. Look on your **Desktop** for **`SmartSpeak-publish-v3.aab`** (versionCode 4 / 1.0.2).
+1. Look on your **Desktop** for **`SmartSpeak-publish-v5.aab`** (versionCode 5 / 1.0.3).
 2. ✅ **Done when:** you can see that file. It's already there — nothing to copy.
 
+> **Ignore `SmartSpeak-publish-v3.aab`** if it's still sitting next to it — that one is versionCode 4 and
+> Play now rejects it for shipping Play Billing Library 7. Delete it.
+
 > **You do not need to rebuild it.** SmartSpeak is a TWA: the bundle is a shell around the live website,
-> so all the code fixes from 29–30/07 reach testers through the Netlify deploy, not through a new upload.
-> This bundle stays valid until something *native* changes (permissions, icons, splash, SDK levels).
+> so every web fix reaches testers through the Netlify deploy, not through a new upload. This bundle stays
+> valid until something *native* changes (permissions, icons, splash, SDK levels, billing library).
 
 ---
 
@@ -154,7 +157,7 @@ Open https://play.google.com/console in Chrome and sign in. Select the **SmartSp
 
 1. Left sidebar → **Test and release** → **Testing** → **Internal testing**.
 2. Top-right → blue **Create new release** button.
-3. You'll see a box labelled **App bundles**. Drag `SmartSpeak-publish-v3.aab` from your Desktop into it. Wait for the upload bar to finish (~30 seconds).
+3. You'll see a box labelled **App bundles**. Drag `SmartSpeak-publish-v5.aab` from your Desktop into it. Wait for the upload bar to finish (~30 seconds).
 4. If a dialog appears offering **Play App Signing** / "Use Google-generated key" → click **Continue** / **Accept**. This is correct and required.
 5. Scroll down to **Release notes**. In the box, paste:
    ```
