@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { CheckIcon, XMarkIcon, LockClosedIcon } from '@heroicons/react/24/outline';
+import { CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { MOMENTS, DEFAULT_MOMENT, getMoment, saveMoment, type MomentId } from '@/lib/personalise';
 import { saveDailyGoalReps } from '@/lib/local-store';
 import { getModule } from '@/lib/exercises';
@@ -174,17 +174,11 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
             <div className="mt-5 space-y-2.5">
               <PlanRow label="Your goal" value={chosen.blurb} />
               <PlanRow label="Daily target" value={`${reps} rep${reps === 1 ? '' : 's'} — about ${reps} minute${reps === 1 ? '' : 's'}`} />
-              {targetModule && (
-                <PlanRow
-                  label="Goal module"
-                  value={targetModule.name}
-                  icon={<LockClosedIcon className="h-3.5 w-3.5 text-spotlight/70" />}
-                />
-              )}
+              {targetModule && <PlanRow label="Goal module" value={targetModule.name} />}
             </div>
             <p className="mt-4 text-xs text-white/45">
               You start in <span className="font-semibold text-white/70">Command Presence</span> — the
-              foundation every one of these moments is built on. Your goal module unlocks with Pro.
+              foundation every one of these moments is built on.
             </p>
             <button
               onClick={finish}
@@ -205,14 +199,11 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   );
 }
 
-function PlanRow({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
+function PlanRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-hairline bg-surface-1 px-4 py-3">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-white/35">{label}</p>
-      <p className="mt-0.5 flex items-center gap-1.5 text-sm font-semibold text-white/85">
-        {icon}
-        {value}
-      </p>
+      <p className="mt-0.5 text-sm font-semibold text-white/85">{value}</p>
     </div>
   );
 }

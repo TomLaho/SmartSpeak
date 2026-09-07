@@ -75,13 +75,20 @@ export default function TrainHome() {
     if (isSetupDismissed()) {
       setSetup(null);
     } else {
+      // The step is only ever shown before the first rep, so "next" is simply
+      // the first exercise they haven't touched — the same fallback the up-next
+      // card uses before there's any history to reason from.
+      const firstRep =
+        EXERCISES.find((e) => (p.exercises[e.id]?.attempts ?? 0) === 0) ?? EXERCISES[0];
       setSetup(
         setupState({
-          goalChosen: isOnboarded(),
+          // The moment itself, not the onboarded flag: an account onboarded
+          // before first-run asked this question has no moment to credit.
+          goalChosen: loadMoment() !== null,
           totalReps: p.history.length,
           calibrated: loadCalibration() !== null,
           reminderSet: isReminderSet(),
-          firstRepHref: '/train',
+          firstRepHref: `/train/exercise/${firstRep.id}`,
         })
       );
     }
