@@ -11,94 +11,54 @@ Follow top to bottom. One action per step. Don't skip, don't reorder.
 
 | Thing | Status |
 |---|---|
-| Web app (PWA) at smartspeak-app.netlify.app | ⚠️ **Live, but serving OLD code.** The 29–30/07 fixes are pushed to GitHub and did not deploy. **Do PART 0.5 first — testers need this.** |
-| Android App Bundle (`.aab`) | ✅ Built + verified (mic permission, billing, correct package) |
+| Web app (PWA) at smartspeak-app.netlify.app | ⚠️ **Live and current through 30/07.** Two later commits (`27d0caa`, `264cefe`) are committed locally and **not pushed** — push them before any tester installs. See PART 0.5. |
+| Android App Bundle (`.aab`) | ✅ **versionCode 5 / 1.0.3**, built 08/09 — mic, billing, package and signature verified against the extracted bundle. Carries **billingclient 8.3.0**, clearing Play's 01/11/2026 Billing Library requirement. |
 | Upload signing key | ✅ Created — **you must back it up (Step 1)** |
 | Digital asset links (kills the URL bar) | ✅ Done — both upload key and Google's App-signing key are live |
 | Privacy policy URL in Play Console | ✅ Done |
 | **App pricing** | 🚨 **WRONG — app is set to PAID at $13.99. Blocks all testers. See PART 6.5.** |
 | `pro_unlock` in-app product | ⏸ **Deliberately not done — leave it until closed testing ends (Step 10).** While it doesn't exist, testers get the full curriculum free. |
 | Closed test (12 testers / 14 days) | ❌ Not started (Step 11) — **this is the long pole** |
+| Play Billing Library ≥ 8.0.0 (due 01/11/2026) | ✅ **Fixed in code 08/09.** Clears in Console only once versionCode 5 is live on every active track. |
+| Android developer verification (due 30/09/2026) | ❓ **Unverified — check today.** Play Console **Home** shows a package-name status next to each app; anything not auto-registered must be registered manually or the app is removed from Play globally. |
 
 ---
 
-## PART 0.5 — 🚨 Netlify hasn't deployed the new code. Do this before anything else.
+## PART 0.5 — ✅ Resolved 08/09/2026. Netlify was never the problem.
 
-**What happened.** On 30/07 six commits were pushed to `main` on GitHub — including the fix that stops
-testers dead-ending at the paywall. GitHub accepted them (`51b1f46..0d8e44b`). **Netlify never published
-them.** Twenty-two minutes after the push the live site was still serving the pre-29/07 build, confirmed
-by fetching the page and reading which JavaScript bundle it loads.
+**What actually happened.** The 30/07 triage in this section chased a Netlify fault that did not exist.
+Checked at content level on 08/09: every commit up to and including `6b15217` (30/07) **is live** — the
+paywall grace, the model-download warning and the wake lock are all in the bundles the site serves. The
+one change that never reached testers, `27d0caa` (31/07, the first-run redesign), was **committed on this
+machine and never pushed**. `git status -sb` read `## main...origin/main [ahead 1]`.
 
-**Why it matters.** The TWA is a shell around this website. Until Netlify publishes, your `.aab` is
-serving testers the *old* app — the one where the paywall dead-ends after 3 reps. **Uploading to Play
-before this deploy lands means testing the broken version.**
+**The rule that comes out of it:** before ever blaming the host, run this in the repo:
 
-**What is NOT the cause** (already checked, so don't go down these paths): the code builds clean locally
-(typecheck, lint, 94 tests, `next build` — all green), and `pnpm-lock.yaml` is in sync with
-`package.json`, so it is not the classic frozen-lockfile failure.
+```powershell
+git status -sb
+```
 
-### ☐ Step 0.5a — Look at the deploy log
+If it says `[ahead N]`, the code is sitting on your laptop and no amount of Netlify clicking will help.
 
-1. ☐ Open https://app.netlify.com and sign in.
-2. ☐ Click the **smartspeak-app** site.
-3. ☐ Left sidebar → **Deploys**.
-4. ☐ Look at the **top entry** in the list. Note its state and its timestamp.
-5. ✅ **Done when:** you can say which of these four you're looking at:
+The old Steps 0.5a–0.5d are kept below only as a genuine Netlify triage recipe for a future outage — they
+are **not** the current situation.
 
-| What you see | What it means | Go to |
-|---|---|---|
-| **Failed** (red) | The build broke | Step 0.5b |
-| **Building** / **Enqueued** (yellow) | Just slow — it's working | Step 0.5d |
-| **Published** but timestamped *before* today ~21:00 AEST | The webhook never fired | Step 0.5c |
-| **Published** today ~21:00 or later | It did deploy — go verify | Step 0.5d |
+<details>
+<summary>Archived Netlify triage (only if a push really is on GitHub and the site doesn't update)</summary>
 
-### ☐ Step 0.5b — If it says Failed
+1. Netlify → **Deploys** → read the top entry: **Failed** (red) = open it, the real error is in the last
+   20 lines. **Building/Enqueued** = just wait. **Published but old** = the webhook never fired.
+2. Webhook fix: **Deploys** → top-right **Trigger deploy** → **Clear cache and deploy site**, then Site
+   configuration → **Build & deploy** → **Continuous deployment** → confirm the repo is linked and the
+   production branch is `main`.
+3. ⚠️ Never create a *second* Netlify site while troubleshooting — a new URL breaks the TWA and
+   `assetlinks.json`, which are both bound to `smartspeak-app.netlify.app`.
+4. Verify at content level, never on the word "Published": open
+   `https://smartspeak-app.netlify.app/train` in an **incognito** window, start an exercise you have
+   never recorded, and look for `Heads up: your first take downloads a one-time ~55 MB speech model`
+   above the button.
 
-1. ☐ Click the failed deploy to open its log.
-2. ☐ Scroll to the **bottom** — the real error is in the last 20 lines, not the top.
-3. ☐ Copy the last ~30 lines and paste them to me. Don't try to fix it yourself; the log names the cause
-   and the fix is usually one line.
-4. ☐ **Most likely cause:** the build ran out of free-tier build minutes, or the new `vitest`
-   devDependency failed to install. If the log mentions **minutes** or **usage limit**, go to
-   **Billing → Usage** — the allowance resets monthly, and a manual retry won't help until it does.
-5. ✅ **Done when:** you've either pasted the log to me, or confirmed it's a usage cap.
-
-### ☐ Step 0.5c — If the webhook never fired
-
-The push is on GitHub, so this is a broken connection between the two, not a code problem.
-
-1. ☐ Netlify → **Deploys** → top-right **Trigger deploy** dropdown → **Clear cache and deploy site**.
-   (Use the *clear cache* variant, not plain "Deploy site".)
-2. ☐ Watch it build (~2 min).
-3. ☐ **If that works, the webhook is the problem — reconnect it:** Site configuration → **Build & deploy**
-   → **Continuous deployment** → check that the repository is linked and the **production branch is
-   `main`**. If it shows a different branch, that alone explains everything.
-4. ✅ **Done when:** the new deploy reaches **Published**.
-
-> ⚠️ Don't create a *second* Netlify site while troubleshooting. A new site gets a new URL, and the TWA
-> and `assetlinks.json` are both bound to `smartspeak-app.netlify.app`. A new URL breaks the Android app.
-
-### ☐ Step 0.5d — Verify the live site is actually the new code
-
-Don't trust "Published" — check the site itself. This is a 30-second test on your phone or desktop
-browser (**not** the installed Android app, which caches).
-
-1. ☐ Open https://smartspeak-app.netlify.app/train in Chrome.
-2. ☐ Start any exercise you have **never** recorded before, and look at the screen *before* tapping
-   **Start recording**.
-3. ☐ Look for this line above the button:
-   ```
-   Heads up: your first take downloads a one-time ~55 MB speech model
-   ```
-4. ☐ **If you see it:** the new code is live. ✅ Done — go back to PART 1.
-5. ☐ **If you don't see it:** either the deploy still hasn't landed, or you're looking at an exercise
-   you've already recorded (the warning only shows before your very first take on that device). Try in a
-   **private/incognito window** to rule that out.
-6. ✅ **Done when:** you've seen that line in a fresh browser, or you've told me it's still missing.
-
-> **The stronger test, once you're in Play testing:** install the app, do 3 reps, then open a 4th
-> exercise. On the **new** code it opens normally. On the **old** code you get the paywall and a "Unlock
-> for $10" button that fails. That single check tells you which version testers are on.
+</details>
 
 ---
 
@@ -117,7 +77,8 @@ Check which account type you have: Play Console → **Settings** (gear, bottom-l
 
 | File | Use it? |
 |---|---|
-| `C:\Users\lahog\Desktop\SmartSpeak-publish-v3.aab` | ✅ **THIS ONE.** versionCode 4 / 1.0.2 — mic + billing + splash + targetSdk 36. Already on your Desktop; the older bundle has been removed so there's only one. |
+| `C:\Users\lahog\Desktop\SmartSpeak-publish-v5.aab` | ✅ **THIS ONE.** versionCode 5 / 1.0.3 — adds Play Billing Library 8.3.0 on top of everything v3 had. |
+| `C:\Users\lahog\Desktop\SmartSpeak-publish-v3.aab` | ❌ **Superseded** — despite the name it is versionCode 4, and Play now rejects it for the old Billing Library. Delete it so you can't pick it by mistake. |
 | `C:\Users\lahog\ClaudeCode\SmartSpeak\android\app\build\outputs\bundle\release\app-release.aab` | ✅ Same file, at its build location. |
 
 > The Android wrapper project now lives at `SmartSpeak\android\` (moved from `ClaudeCode\smartspeak-twa\`). It is git-ignored in full because it contains your keystore and its password — **never force-add anything under `android/` to git.**
