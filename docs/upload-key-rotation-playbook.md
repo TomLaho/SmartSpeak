@@ -4,14 +4,34 @@
 
 ## Status
 
+> **Updated 09/09/2026.** Most of this is already done — Tom worked Phases 0–2 on 02/08 and it wasn't
+> recorded anywhere, which cost a day of confusion when Play rejected a bundle signed with the old key.
+> Read the status table before following any step below.
+
 | Phase | Task | Status |
 |---|---|---|
-| 0 | Pick new password, save to password manager first | ☐ Outstanding |
-| 1 | Generate new keystore + export PEM | ☐ Outstanding |
-| 2 | Request upload key reset in Play Console | ☐ Outstanding |
-| 3 | Point build.gradle / twa-manifest.json at new key, rebuild, upload | ☐ Outstanding (blocked on Phase 2 approval) |
-| 4 | Update assetlinks.json, push, verify LIVE file | ☐ Outstanding |
-| 5 | Delete old keystore | ☐ Outstanding (blocked on Phase 3) |
+| 0 | Pick new password, save to password manager first | ✅ Done 02/08 — password is ONLY in Tom's password manager; verified on 09/09 that the old leaked password does **not** open the new keystore |
+| 1 | Generate new keystore + export PEM | ✅ Done 02/08 — `android/smartspeak-upload-2.keystore` (alias `smartspeak2`) + `android/upload_certificate.pem` |
+| 2 | Request upload key reset in Play Console | ✅ Done — confirmed 09/09: Play's rejection names `ED:E8:65:AB…1C:9F` as the expected certificate, which is exactly this keystore |
+| 3 | Point build.gradle at new key, rebuild, upload | ⚠️ **In progress** — `android/app/build.gradle` now reads `android/keystore.properties` (git-ignored) and names `smartspeak-upload-2.keystore` / alias `smartspeak2`. Needs the password to build. |
+| 4 | Update assetlinks.json, push, verify LIVE file | ✅ Done 09/09 — `ED:E8…` added, pushed, verified live |
+| 5 | Delete old keystore | ☐ **Outstanding** — blocked on Phase 3 |
+| 6 | Drop the dead fingerprint from assetlinks.json | ☐ **Outstanding** — `58:5F:7C…56:98` is the leaked key and is still listed. Safe to remove once no test device has a build signed with it. Not urgent, but don't leave it forever. |
+| 7 | Re-check the leaked password isn't reused elsewhere | ☐ **Outstanding** — `SmartSpeak2024!` is public in commit `2407158`. It no longer opens anything in this project; make sure it doesn't open anything in another. |
+
+### The two fingerprints that matter
+
+| Key | SHA-256 | Use |
+|---|---|---|
+| Upload key 2 — **current** | `ED:E8:65:AB:5A:03:3E:09:74:07:A8:DB:16:CF:34:21:28:F8:9D:C4:41:89:D6:C3:E3:AA:90:49:59:48:1C:9F` | Sign every bundle with this |
+| Upload key 1 — dead, leaked | `58:5F:7C:A8:ED:AC:8F:36:C4:C0:1E:BF:58:1F:32:2F:73:25:8A:20:CF:50:D5:B6:58:ED:23:CD:15:2B:56:98` | Never sign with this again |
+| Google app-signing key | `A9:9C:E7:CF:51:D6:3E:82:D9:92:B8:A5:E7:30:DA:9E:D5:1D:53:B5:5B:76:39:9A:12:3B:2B:68:C7:16:3C:1E` | Never changes; what Play-installed apps carry |
+
+Before blaming anything else for a signing failure, run this and compare against the table:
+
+```powershell
+keytool -printcert -jarfile C:\Users\lahog\Desktop\SmartSpeak-publish-v5.aab
+```
 
 ---
 
