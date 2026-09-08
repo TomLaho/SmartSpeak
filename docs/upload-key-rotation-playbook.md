@@ -18,6 +18,7 @@
 | 5 | Delete old keystore | ☐ **Outstanding** — blocked on Phase 3 |
 | 6 | Drop the dead fingerprint from assetlinks.json | ☐ **Outstanding** — `58:5F:7C…56:98` is the leaked key and is still listed. Safe to remove once no test device has a build signed with it. Not urgent, but don't leave it forever. |
 | 7 | Re-check the leaked password isn't reused elsewhere | ☐ **Outstanding** — `SmartSpeak2024!` is public in commit `2407158`. It no longer opens anything in this project; make sure it doesn't open anything in another. |
+| 8 | Change the upload keystore 2 password | ☐ **Outstanding, low urgency** — it was shared into a Claude session transcript on 09/09 to unblock the build, and it sits in `android/keystore.properties` (git-ignored). The keystore file itself has never left this machine, so exposure is low. `keytool -storepasswd -keystore smartspeak-upload-2.keystore` changes it with no Play reset required — the certificate is unchanged, so nothing in Play Console or assetlinks needs touching. |
 
 ### The two fingerprints that matter
 
