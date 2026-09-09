@@ -7,10 +7,15 @@ import { audioMetrics } from './helpers';
 const scripted = EXERCISES.find((e) => e.type === 'read' && e.readingText) as Exercise;
 const spoken = EXERCISES.find((e) => e.type !== 'read') as Exercise;
 
+// 74 words — comfortably clears the 0.4 coverage threshold for every
+// exercise this file uses it with (see the "coverage multiplier" tests
+// below), so it reads as a complete take for facet/weighting/xp assertions
+// that aren't themselves testing coverage.
 const SPEECH =
-  'Last quarter we lost 12 hours a week to manual reconciliation. First we mapped every handoff, ' +
-  'then we found the bottleneck sat in one spreadsheet. But the fix was small. I need one decision ' +
-  'from you today: approve the pilot for two teams.';
+  'Last quarter we lost 12 hours a week to manual reconciliation across three separate teams. ' +
+  'First we mapped every handoff to see the process end to end, then we found the bottleneck ' +
+  'sat in one shared spreadsheet nobody owned. But the fix was small and did not require new headcount. ' +
+  'I need one decision from you today: approve the pilot for two teams to prove it out before scaling further.';
 
 describe('paceWpm', () => {
   it('prefers the transcript-independent syllable estimate', () => {
@@ -167,23 +172,11 @@ describe('overall score', () => {
     expect(result.overallScore).toBeGreaterThan(Math.round(plainMean));
   });
 
-  it('caps a near-empty take regardless of how its measured dimensions score', () => {
-    const result = coachAttempt(spoken, 'great point really good stuff', fullLength());
-    expect(result.wordCount).toBeLessThan(25);
-    expect(result.overallScore).toBeLessThanOrEqual(55);
-  });
-
-  it('says why the score is capped when the take is too short', () => {
-    const result = coachAttempt(spoken, 'great point really good stuff', fullLength());
-    expect(result.improvements.some((i) => /too little to score/i.test(i))).toBe(true);
-    expect(result.quickWin).toMatch(/keep talking/i);
-  });
-
-  it('does not cap a full-length take even at 25+ words', () => {
+  it('does not cap a full-length take that clears the coverage bar', () => {
     const result = coachAttempt(spoken, SPEECH, fullLength());
-    expect(result.wordCount).toBeGreaterThanOrEqual(25);
-    // SPEECH is a strong, well-formed take — the cap must not touch it.
-    expect(result.overallScore).toBeGreaterThan(55);
+    // SPEECH is a strong, well-formed, complete take — the floor/coverage
+    // mechanisms must not touch it.
+    expect(result.overallScore).toBeGreaterThan(65);
   });
 
   it('stays within 0–100 for degenerate input', () => {
@@ -271,67 +264,93 @@ describe('facets', () => {
   });
 });
 
-describe('duration cap', () => {
-  // scripted (d1-pace) has targetSeconds = 60. Use its full passage as the
-  // transcript so the 25-word short-take cap never confounds these.
-  const text = scripted.readingText as string;
-  const withSpeakingSec = (speakingSec: number) =>
-    coachAttempt(scripted, text, audioMetrics({ speakingSec }));
-  const uncapped = withSpeakingSec(60).overallScore; // 100% of target — no cap
+describe('intelligibility floor', () => {
+  // These caps key off wordCount alone — audio timing is irrelevant, so use
+  // fullLength() throughout to prove that.
+  const fullLength = () => audioMetrics({ speakingSec: spoken.targetSeconds });
 
-  it('applies no cap at or above 70% of target', () => {
-    // 0.7 * 60 = 42s exactly — the boundary itself must NOT be capped.
-    expect(withSpeakingSec(42).overallScore).toBe(uncapped);
-    expect(withSpeakingSec(50).overallScore).toBe(uncapped);
+  it('scores 0 for an empty transcript', () => {
+    const result = coachAttempt(spoken, '', fullLength());
+    expect(result.wordCount).toBe(0);
+    expect(result.overallScore).toBe(0);
   });
 
-  it('caps at 72 for 40%–70% of target, including the lower boundary', () => {
-    // 0.4 * 60 = 24s exactly falls in this band (not the harsher one below).
-    expect(withSpeakingSec(24).overallScore).toBeLessThanOrEqual(72);
-    expect(withSpeakingSec(41).overallScore).toBeLessThanOrEqual(72);
-    if (uncapped > 72) {
-      expect(withSpeakingSec(24).overallScore).toBe(72);
-      expect(withSpeakingSec(41).overallScore).toBe(72);
-    }
+  it('caps 1–4 words at 10', () => {
+    const result = coachAttempt(spoken, 'yes it works great', fullLength());
+    expect(result.wordCount).toBe(4);
+    expect(result.overallScore).toBeLessThanOrEqual(10);
   });
 
-  it('caps at 55 under 40% of target', () => {
-    expect(withSpeakingSec(23).overallScore).toBeLessThanOrEqual(55);
-    expect(withSpeakingSec(5).overallScore).toBeLessThanOrEqual(55);
-    if (uncapped > 55) {
-      expect(withSpeakingSec(23).overallScore).toBe(55);
-    }
-  });
-
-  it('takes the lowest applicable cap when both the word cap and duration cap apply', () => {
-    // 3 words (short-take cap, 55) and 5s of a 60s target (duration cap, 55) —
-    // both land on the same floor here, but the overall must never exceed it.
-    const result = coachAttempt(scripted, 'yes it works', audioMetrics({ speakingSec: 5 }));
-    expect(result.overallScore).toBeLessThanOrEqual(55);
-  });
-
-  it('says why in plain language, with the actual numbers', () => {
-    const result = withSpeakingSec(10);
-    expect(result.improvements.some((i) => /10s of a 60s target/.test(i))).toBe(true);
-    expect(result.quickWin).toMatch(/full length/i);
-  });
-
-  it('never applies when speaking time is unmeasurable (no audio)', () => {
-    // Guard: an unmeasurable thing must never be the reason someone is marked down.
-    const withoutAudio = coachAttempt(scripted, text, audioMetrics({ speakingSec: 0 }));
-    const withoutTarget = coachAttempt(
-      { ...scripted, targetSeconds: 0 } as Exercise,
-      text,
-      audioMetrics({ speakingSec: 0 })
+  it('caps 5–14 words at 30', () => {
+    const result = coachAttempt(
+      spoken,
+      'great point really good stuff thanks everyone for listening today',
+      fullLength()
     );
-    expect(withoutAudio.overallScore).toBe(withoutTarget.overallScore);
-    expect(withoutAudio.improvements.some((i) => /target/.test(i))).toBe(false);
+    expect(result.wordCount).toBeGreaterThanOrEqual(5);
+    expect(result.wordCount).toBeLessThanOrEqual(14);
+    expect(result.overallScore).toBeLessThanOrEqual(30);
   });
 
-  it('never applies when the exercise has no target duration', () => {
-    const noTarget = { ...scripted, targetSeconds: 0 } as Exercise;
-    const result = coachAttempt(noTarget, text, audioMetrics({ speakingSec: 5 }));
-    expect(result.improvements.some((i) => /target/.test(i))).toBe(false);
+  it('does not floor-cap 15 words (the coverage multiplier may still apply)', () => {
+    // 15 words sits just above the 5–14 floor band, so the hard 30 cap no
+    // longer applies — but 15/145 is still far below the 0.40 coverage knee
+    // (see the "coverage multiplier" tests below), so the score can still
+    // legitimately land under 30 for a different reason.
+    const fifteen = Array.from({ length: 15 }, (_, i) => `word${i}`).join(' ');
+    const result = coachAttempt(spoken, fifteen, fullLength());
+    expect(result.wordCount).toBe(15);
+    expect(result.improvements.some((i) => /a fragment of what the prompt asks for/i.test(i))).toBe(false);
+  });
+
+  it('says why in plain language, about words rather than seconds', () => {
+    const result = coachAttempt(spoken, 'yes it works', fullLength());
+    expect(result.improvements.some((i) => /word/i.test(i))).toBe(true);
+    expect(result.improvements.some((i) => /second/i.test(i))).toBe(false);
+    expect(result.quickWin).toMatch(/word|talk|say/i);
+  });
+});
+
+describe('coverage multiplier', () => {
+  // d3-fillers (spoken) has targetSeconds = 60, so expectedWords =
+  // round(60 * 145 / 60) = 145 exactly — the 0.40 knee sits at 58 words.
+  const fullLength = () => audioMetrics({ speakingSec: spoken.targetSeconds });
+  const wordsOf = (n: number) => Array.from({ length: n }, (_, i) => `content${i}`).join('. ') + '.';
+  const hasCoverageNote = (i: string) => /complete response needs/.test(i);
+
+  it('applies no penalty at exactly the 0.40 knee (58/145 words)', () => {
+    const result = coachAttempt(spoken, wordsOf(58), fullLength());
+    expect(result.improvements.some(hasCoverageNote)).toBe(false);
+  });
+
+  it('applies a penalty just below the knee (57/145 words)', () => {
+    const result = coachAttempt(spoken, wordsOf(57), fullLength());
+    expect(result.improvements.some(hasCoverageNote)).toBe(true);
+  });
+
+  it('scales down further the further below the knee coverage falls', () => {
+    const nearKnee = coachAttempt(spoken, wordsOf(57), fullLength());
+    const farBelowKnee = coachAttempt(spoken, wordsOf(29), fullLength()); // ~0.20 coverage
+    expect(farBelowKnee.overallScore).toBeLessThan(nearKnee.overallScore);
+  });
+
+  it('for a scripted read, uses the script\'s own word count as the expectation', () => {
+    const fullScript = scripted.readingText as string;
+    const words = fullScript.split(/\s+/);
+    const partial = words.slice(0, Math.floor(words.length * 0.3)).join(' '); // well under 0.4 coverage
+    const result = coachAttempt(scripted, partial, audioMetrics());
+    expect(result.improvements.some(hasCoverageNote)).toBe(true);
+  });
+
+  it('never applies to a scripted read when the full script is spoken', () => {
+    const result = coachAttempt(scripted, scripted.readingText as string, audioMetrics());
+    expect(result.improvements.some(hasCoverageNote)).toBe(false);
+  });
+
+  it('never applies when there is no target duration and no script (unmeasurable guard)', () => {
+    const noTarget = { ...spoken, targetSeconds: 0 } as Exercise;
+    const result = coachAttempt(noTarget, 'a fairly short reply right here', audioMetrics());
+    expect(result.improvements.some(hasCoverageNote)).toBe(false);
   });
 });
 

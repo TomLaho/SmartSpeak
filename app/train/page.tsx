@@ -34,7 +34,14 @@ import {
   FREE_EXERCISE_LIMIT,
   PRO_PRICE,
 } from '@/lib/entitlement';
-import { recommendNext, moduleProgress, moduleStatusLabel, isExerciseUnlockedInModule } from '@/lib/selection';
+import {
+  recommendNext,
+  moduleProgress,
+  moduleStatusLabel,
+  isExerciseUnlockedInModule,
+  isModuleUnlockedByProgress,
+  moduleLockReason,
+} from '@/lib/selection';
 import { loadMoment, getMoment } from '@/lib/personalise';
 import {
   setupState,
@@ -83,7 +90,7 @@ export default function TrainHome() {
         EXERCISES.find((e) => {
           if ((p.exercises[e.id]?.attempts ?? 0) > 0) return false;
           const mod = moduleForExercise(e.id);
-          return !mod || isExerciseUnlockedInModule(p, mod.id, e.id);
+          return !mod || (isModuleUnlockedByProgress(p, mod.id) && isExerciseUnlockedInModule(p, mod.id, e.id));
         }) ?? EXERCISES[0];
       setSetup(
         setupState({
@@ -132,7 +139,7 @@ export default function TrainHome() {
       if (attempted(e.id)) return false;
       if (!progress) return true;
       const mod = moduleForExercise(e.id);
-      return !mod || isExerciseUnlockedInModule(progress, mod.id, e.id);
+      return !mod || (isModuleUnlockedByProgress(progress, mod.id) && isExerciseUnlockedInModule(progress, mod.id, e.id));
     }) ??
     EXERCISES[0];
   // Before there's any history to reason from, the reason is the user's own
@@ -319,9 +326,12 @@ export default function TrainHome() {
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-white/40">Learning Modules</h2>
         <div className="space-y-3">
           {MODULES.map((module) => {
-            const unlocked = isModuleUnlocked({ pro, order: module.order });
+            const proUnlocked = isModuleUnlocked({ pro, order: module.order });
+            const progressUnlocked = progress
+              ? isModuleUnlockedByProgress(progress, module.id as ModuleId)
+              : module.order <= 3;
             const isGoal = module.id === goalModuleId;
-            if (!unlocked) {
+            if (!proUnlocked) {
               // Locked module — visible curiosity gap pointing at the Pro unlock.
               // The user's own goal module is called out by name: the clearest,
               // most honest reason this particular person would want Pro.
@@ -358,6 +368,30 @@ export default function TrainHome() {
                   </div>
                   <ChevronRightIcon className="h-4 w-4 shrink-0 text-white/30" />
                 </Link>
+              );
+            }
+            if (!progressUnlocked) {
+              // Locked by sequence, not by Pro — no purchase clears this one, so
+              // it's a plain (non-tappable) card with the actual reason, not a
+              // link into the paywall.
+              const reason = progress ? moduleLockReason(progress, module.id as ModuleId) : null;
+              return (
+                <div
+                  key={module.id}
+                  className="flex items-center gap-4 rounded-2xl border border-hairline bg-surface-1 p-4 opacity-70"
+                >
+                  <div className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-xl opacity-50', module.gradient)}>
+                    {module.emoji}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate font-bold leading-tight text-white/80">{module.name}</p>
+                      <LockClosedIcon className="h-3.5 w-3.5 shrink-0 text-white/30" />
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-white/45">{module.blurb}</p>
+                    {reason && <p className="mt-1 text-[10px] font-semibold text-white/40">{reason}</p>}
+                  </div>
+                </div>
               );
             }
             const mp = progress

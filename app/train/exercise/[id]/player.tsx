@@ -13,7 +13,7 @@ import {
   countWords,
   expectedSeconds,
 } from '@/lib/exercises';
-import { isExerciseUnlockedInModule } from '@/lib/selection';
+import { isExerciseUnlockedInModule, isModuleUnlockedByProgress } from '@/lib/selection';
 import { analyzeAudioInWorker, type AudioMetrics } from '@/lib/audio-analysis';
 import { coachAttempt, headlineFor, paceWpm, type CoachResult, type Facet } from '@/lib/coach';
 import { loadCalibration, toCalibrationInput } from '@/lib/calibration';
@@ -252,7 +252,13 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     const learningModule = moduleForExercise(exercise.id);
     if (!learningModule) return;
     const progress = loadProgress();
-    if (!isExerciseUnlockedInModule(progress, learningModule.id, exercise.id)) {
+    // Progression-locked (module not reached yet) or out-of-sequence within
+    // an open module — either way, send them to the module page rather than
+    // starting a rep they haven't unlocked.
+    if (
+      !isModuleUnlockedByProgress(progress, learningModule.id) ||
+      !isExerciseUnlockedInModule(progress, learningModule.id, exercise.id)
+    ) {
       router.replace(`/train/module/${learningModule.id}`);
     }
   }, [exercise, router]);
@@ -1058,6 +1064,11 @@ function ResultsView({
                 Score breakdown
               </p>
               <ScoreRadar axes={radarAxes} />
+              {radarAxes.length < 6 && (
+                <p className="mt-2 text-xs text-white/40">
+                  This rep grades delivery only — the words are the script&apos;s, not yours.
+                </p>
+              )}
             </div>
           )}
 

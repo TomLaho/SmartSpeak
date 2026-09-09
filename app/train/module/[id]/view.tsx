@@ -29,6 +29,8 @@ import {
   moduleStatusLabel,
   isMastered,
   isExerciseUnlockedInModule,
+  isModuleUnlockedByProgress,
+  moduleLockReason,
 } from '@/lib/selection';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -86,7 +88,22 @@ export default function ModulePage({ params }: { params: { id: string } }) {
       ).length
     : 0;
 
-  const moduleLocked = !isModuleUnlocked({ pro, order: learningModule.order });
+  const proLocked = !isModuleUnlocked({ pro, order: learningModule.order });
+  // Fallback (progress not loaded yet) mirrors isModuleUnlockedByProgress's
+  // own always-open rule for the first three modules.
+  const progressLocked = progress
+    ? !isModuleUnlockedByProgress(progress, moduleId)
+    : learningModule.order > 3;
+  const moduleLocked = proLocked || progressLocked;
+  // Progression is the more specific reason when both apply — buying Pro
+  // alone would not open this module, so that's the fact worth surfacing.
+  const lockReason = progress
+    ? moduleLockReason(progress, moduleId)
+    : progressLocked
+    ? 'Complete earlier modules to unlock'
+    : null;
+  const lockHref = progressLocked ? '/train' : '/train/unlock';
+  const lockSubtitle = progressLocked ? lockReason ?? 'Locked' : `Unlock with Pro · ${PRO_PRICE}`;
 
   function stateFor(exerciseId: string): StepState {
     const attempts = progress?.exercises[exerciseId]?.attempts ?? 0;
@@ -106,8 +123,7 @@ export default function ModulePage({ params }: { params: { id: string } }) {
   }
 
   const ctaState = stateFor(next.id);
-  const ctaHref =
-    ctaState === 'locked' ? '/train/unlock' : `/train/exercise/${next.id}`;
+  const ctaHref = ctaState === 'locked' ? lockHref : `/train/exercise/${next.id}`;
 
   return (
     <div className="flex min-h-[100dvh] flex-col px-5 pb-8 pt-5">
@@ -219,6 +235,8 @@ export default function ModulePage({ params }: { params: { id: string } }) {
                   best={best}
                   accent={learningModule.accent}
                   isLast={isLast}
+                  lockHref={lockHref}
+                  lockSubtitle={lockSubtitle}
                 />
               </li>
             );
@@ -233,7 +251,9 @@ export default function ModulePage({ params }: { params: { id: string } }) {
         className="mt-auto h-14 w-full rounded-2xl bg-spotlight text-base text-ink hover:bg-spotlight-soft"
       >
         {ctaState === 'locked'
-          ? distinctAttempted === 0
+          ? progressLocked
+            ? lockReason ?? 'Locked'
+            : distinctAttempted === 0
             ? "See what's in Pro"
             : `Unlock · ${PRO_PRICE}`
           : mp.started
@@ -309,14 +329,18 @@ function StepCard({
   best,
   accent,
   isLast,
+  lockHref,
+  lockSubtitle,
 }: {
   exercise: { id: string; title: string; summary: string };
   state: StepState;
   best: number | undefined;
   accent: string;
   isLast: boolean;
+  lockHref: string;
+  lockSubtitle: string;
 }) {
-  const href = state === 'locked' ? '/train/unlock' : `/train/exercise/${exercise.id}`;
+  const href = state === 'locked' ? lockHref : `/train/exercise/${exercise.id}`;
 
   const subtitle =
     state === 'mastered'
@@ -326,7 +350,7 @@ function StepCard({
       : state === 'current'
       ? exercise.summary
       : state === 'locked'
-      ? `Unlock with Pro · ${PRO_PRICE}`
+      ? lockSubtitle
       : exercise.summary;
 
   const className = cn(

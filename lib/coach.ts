@@ -19,6 +19,51 @@ import {
  *
  * (In the cloud build this is where an LLM pass would be layered on top; the
  * heuristic scores make a great, cheap prompt scaffold.)
+ *
+ * ─────────────────────── Overall-score rubric ───────────────────────
+ *
+ * The overall score is assessed against an explicit 0–100 scale, not a
+ * number tuned to make one anecdote look right:
+ *
+ *   0      No intelligible speech — silence, or nothing the recogniser could
+ *          turn into words.
+ *   1–20   A handful of words; no attempt at the task.
+ *   21–45  A fragment — a small part of what the prompt asks for.
+ *   46–65  A real attempt, either partial or complete-but-poorly-delivered.
+ *   66–80  A complete response, competently delivered.
+ *   81–92  Complete, well-structured, well-delivered.
+ *   93–100 Rare — nothing meaningfully left to improve on any measured
+ *          dimension.
+ *
+ * Two mechanisms implement it, both applied to the *overall* score only —
+ * never to an individual dimension:
+ *
+ * 1. Intelligibility floor (hard caps): 0 words → 0, 1–4 words → capped at
+ *    10, 5–14 words → capped at 30. Below a certain word count there simply
+ *    isn't a response to grade, no matter how clean the audio was. Under 15
+ *    words every dimension is also marked unmeasured, so the breakdown shows
+ *    "—" rather than confident numbers arithmetic'd out of eight words.
+ *
+ * 2. Coverage multiplier: `coverage = wordCount / expectedWords`, where
+ *    `expectedWords` is the script's word count on a scripted read, or the
+ *    words a normal speaker fits in `targetSeconds` otherwise. The
+ *    multiplier is 1.0 from coverage 0.40 upward, and falls linearly to 0
+ *    below that. The knee sits at 0.40, not 1.0, deliberately: a concise,
+ *    complete answer must not be punished for finishing early, but a
+ *    fragment must be. This replaces an earlier version of this cap that
+ *    fired on *duration* vs. `targetSeconds` — duration is a proxy for
+ *    effort, not for quality, and it once overrode three strong measured
+ *    dimensions (Pace 87 / Voice 100 / Fluency 97) to produce a headline
+ *    score of 55 for a take that said everything the prompt asked. See
+ *    tasks/lessons.md, 10/09/2026.
+ *
+ * Deliberately NOT implemented: topic-relevance / semantic scoring of
+ * whether the words are *about* the prompt. On-device that would reduce to
+ * bag-of-words overlap against the prompt text, which false-positives on any
+ * legitimate answer phrased in the speaker's own words. Penalising a real,
+ * on-topic user for that is worse than failing to catch the rare person who
+ * reads a shopping list instead of answering — so this coach only checks
+ * that words exist and roughly how many, never what they're about.
  */
 
 export interface DimensionScore {
@@ -533,6 +578,18 @@ export function coachAttempt(
 
   const focusScores = scores.filter((s) => focus.includes(s.dimension));
 
+  // Below the intelligibility floor the dimension scorers are measuring noise
+  // rather than delivery — pace over eight words is arithmetic on nothing, and
+  // a transcript that short can't show structure. Mark them unmeasured so the
+  // screen renders "\u2014" instead of confident numbers sitting above a floored
+  // headline. Numbers that contradict the score beneath them are exactly what
+  // made the old duration cap read as a broken app (tasks/lessons.md,
+  // 10/09/2026), and the fix has to hold at this end of the scale too.
+  const TOO_LITTLE_TO_GRADE = 15;
+  if (wordCount < TOO_LITTLE_TO_GRADE) {
+    for (const s of scores) s.measured = false;
+  }
+
   // Facets group the ten dimensions into six for the results screen. The
   // overall score is now computed one level up from facets rather than raw
   // dimensions, with the same 2x-for-focus idea — otherwise a facet made of
@@ -548,59 +605,78 @@ export function coachAttempt(
       ? 0
       : clamp(facetBase.reduce((a, f) => a + f.score * facetWeightOf(f), 0) / facetTotalWeight);
 
-  // Under 25 words there isn't enough signal to justify a confident score —
-  // a near-empty take must not be able to coast on a couple of strong
-  // dimensions (e.g. a fast, well-paced "um").
-  const SHORT_TAKE_WORDS = 25;
-  const isShortTake = wordCount < SHORT_TAKE_WORDS;
-  if (isShortTake) overallScore = Math.min(overallScore, 55);
-
-  // A take that stops well short of the exercise's target length can't be
-  // judged as a full one, no matter how clean the dimensions that *were*
-  // measured come back — 16 seconds of a 45-second exercise is a fragment,
-  // not a fast, well-paced take. Guarded on both sides: no target to compare
-  // against, or no measurable speaking time (audio unavailable), means this
-  // can't be assessed and must never be the reason someone is marked down.
+  // Coverage multiplier: how much of the expected response was actually
+  // said, vs. how much a complete one requires. Replaces an earlier cap that
+  // keyed off *duration* (speaking time vs. targetSeconds) — see the module
+  // doc comment for why that was wrong. `expectedWords` is the script's own
+  // length on a scripted read (the presenter can't be expected to say more
+  // or less than the passage), or the words a normal speaker fits in
+  // targetSeconds otherwise. Guarded: no script and no usable target means
+  // this is unmeasurable and must never be the reason someone is marked
+  // down.
+  const scriptWordCount = scripted ? tokenize(spokenText(exercise.readingText ?? '')).length : 0;
   const hasTarget = typeof exercise.targetSeconds === 'number' && exercise.targetSeconds > 0;
-  const hasSpeakingTime = audio.speakingSec > 0;
-  let durationNote: string | undefined;
-  if (hasTarget && hasSpeakingTime) {
-    const completeness = audio.speakingSec / exercise.targetSeconds;
-    let durationCap: number | undefined;
-    if (completeness < 0.4) durationCap = 55;
-    else if (completeness < 0.7) durationCap = 72;
-    if (durationCap !== undefined) {
-      overallScore = Math.min(overallScore, durationCap);
-      durationNote = `${Math.round(audio.speakingSec)}s of a ${exercise.targetSeconds}s target — a part-take can't score like a full one.`;
+  const expectedWords: number | undefined = scripted
+    ? scriptWordCount || undefined
+    : hasTarget
+    ? Math.round((exercise.targetSeconds * 145) / 60)
+    : undefined;
+
+  let coverageNote: string | undefined;
+  if (typeof expectedWords === 'number' && expectedWords > 0) {
+    const coverage = wordCount / expectedWords;
+    if (coverage < 0.4) {
+      const multiplier = coverage / 0.4;
+      overallScore = clamp(overallScore * multiplier);
+      coverageNote = `${wordCount} of the ~${expectedWords} words a complete response needs — a partial take can't score like a full one.`;
     }
   }
+
+  // Intelligibility floor: hard caps on the overall (never on individual
+  // dimensions) for when there simply isn't enough said to grade, no matter
+  // how clean the audio metrics that were measured come back.
+  let floorCap: number | undefined;
+  let floorNote: string | undefined;
+  if (wordCount === 0) {
+    floorCap = 0;
+    floorNote = 'No words came through — nothing to score. Make sure you\'re speaking into the mic and try again.';
+  } else if (wordCount <= 4) {
+    floorCap = 10;
+    floorNote = `Only ${wordCount} word${wordCount === 1 ? '' : 's'} — that's not an attempt at the task yet.`;
+  } else if (wordCount <= 14) {
+    floorCap = 30;
+    floorNote = `Only ${wordCount} words — a fragment of what the prompt asks for. Say more next take.`;
+  }
+  if (floorCap !== undefined) overallScore = Math.min(overallScore, floorCap);
 
   const ranked = [...scores].filter((s) => s.measured).sort((a, b) => b.score - a.score);
   const strengths = ranked.filter((s) => s.score >= 75).slice(0, 3).map((s) => s.detail);
   const improvements = ranked.filter((s) => s.score < 70).reverse().slice(0, 3).map((s) => s.detail);
 
-  // The per-dimension scores above are untouched by the short-take/duration
-  // caps, so on their own they can look fine (or even blank the improvements
-  // list) while the headline score sits well below them — that would read as
-  // a bug, not a signal. Say plainly why the score is capped instead of
-  // leaving it unexplained.
-  if (durationNote) {
-    improvements.unshift(durationNote);
+  // The per-dimension scores above are untouched by the floor/coverage caps,
+  // so on their own they can look fine (or even blank the improvements list)
+  // while the headline score sits well below them — that would read as a
+  // bug, not a signal. Say plainly why the score is capped instead of
+  // leaving it unexplained. The floor note (word count near zero) is the
+  // more urgent message, so it wins when both would otherwise fire.
+  if (!floorNote && coverageNote) {
+    improvements.unshift(coverageNote);
     improvements.length = Math.min(improvements.length, 3);
   }
-  const SHORT_TAKE_NOTE = `Only ${wordCount} word${wordCount === 1 ? '' : 's'} — too little to score with confidence. Say more next take.`;
-  if (isShortTake) {
-    improvements.unshift(SHORT_TAKE_NOTE);
+  if (floorNote) {
+    improvements.unshift(floorNote);
     improvements.length = Math.min(improvements.length, 3);
   }
 
   // Fallbacks so the screen is never empty.
   if (strengths.length === 0 && ranked.length) strengths.push(ranked[0].detail);
   const weakest = ranked.length ? ranked[ranked.length - 1] : focusScores[0];
-  const quickWin = isShortTake
-    ? 'Next take: keep talking — a full take gives the coach enough to score fairly.'
-    : durationNote
-    ? "Next take: keep going for the full length — a part-take can't show what you can do."
+  const quickWin = floorNote
+    ? wordCount === 0
+      ? 'Next take: say something — the coach needs words to work with.'
+      : 'Next take: keep talking — a full take gives the coach enough to score fairly.'
+    : coverageNote
+    ? "Next take: keep going until you've fully answered the prompt — a partial take can't show what you can do."
     : weakest
     ? quickWinFor(weakest.dimension)
     : 'Record one more take and compare your scores.';

@@ -10,6 +10,7 @@ import {
   nextInModule,
   isMastered,
   isExerciseUnlockedInModule,
+  isModuleUnlockedByProgress,
 } from '@/lib/selection';
 import { MODULES, exercisesByModule, moduleForExercise, FREE_PLAY_ID, type ModuleId } from '@/lib/exercises';
 import { isModuleUnlocked } from '@/lib/entitlement';
@@ -190,5 +191,51 @@ describe('isMastered', () => {
 
   it('is false for an exercise never attempted', () => {
     expect(isMastered(progressWith({}), paidModule.id)).toBe(false);
+  });
+});
+
+describe('isModuleUnlockedByProgress', () => {
+  const module1 = MODULES.find((m) => m.order === 1)!;
+  const module2 = MODULES.find((m) => m.order === 2)!;
+  const module3 = MODULES.find((m) => m.order === 3)!;
+  const module4 = MODULES.find((m) => m.order === 4)!;
+  const module5 = MODULES.find((m) => m.order === 5)!;
+
+  /** Every exercise in a module attempted at least once — "completed". */
+  function completed(moduleId: ModuleId): Record<string, ExerciseProgress> {
+    return Object.fromEntries(exercisesByModule(moduleId).map((e) => [e.id, ex()]));
+  }
+
+  it('opens the first three modules from a blank slate', () => {
+    const state = progressWith({});
+    expect(isModuleUnlockedByProgress(state, module1.id as ModuleId)).toBe(true);
+    expect(isModuleUnlockedByProgress(state, module2.id as ModuleId)).toBe(true);
+    expect(isModuleUnlockedByProgress(state, module3.id as ModuleId)).toBe(true);
+  });
+
+  it('locks the fourth module with no progress', () => {
+    expect(isModuleUnlockedByProgress(progressWith({}), module4.id as ModuleId)).toBe(false);
+  });
+
+  it('unlocks the fourth module, and no further, once module 1 is completed', () => {
+    const state = progressWith(completed(module1.id as ModuleId));
+    expect(isModuleUnlockedByProgress(state, module4.id as ModuleId)).toBe(true);
+    expect(isModuleUnlockedByProgress(state, module5.id as ModuleId)).toBe(false);
+  });
+
+  it('unlocks the fifth module once two modules are completed', () => {
+    const state = progressWith({
+      ...completed(module1.id as ModuleId),
+      ...completed(module2.id as ModuleId),
+    });
+    expect(isModuleUnlockedByProgress(state, module5.id as ModuleId)).toBe(true);
+  });
+
+  it('is independent of pro', () => {
+    // The gate takes no pro flag at all — buying Pro never substitutes for
+    // finishing earlier modules.
+    const state = progressWith({});
+    expect(isModuleUnlockedByProgress(state, module4.id as ModuleId)).toBe(false);
+    expect(isModuleUnlocked({ pro: true, order: module4.order })).toBe(true);
   });
 });

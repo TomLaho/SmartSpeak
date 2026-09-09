@@ -16,7 +16,7 @@
  *   4. Fallback to EXERCISES[0].
  */
 
-import { EXERCISES, exercisesByModule, moduleForExercise, FREE_PLAY_ID, type Exercise, type ModuleId } from './exercises';
+import { EXERCISES, exercisesByModule, moduleForExercise, MODULES, FREE_PLAY_ID, type Exercise, type ModuleId } from './exercises';
 import { isModuleUnlocked } from './entitlement';
 import { dayKey, type Progress } from './local-store';
 
@@ -104,6 +104,42 @@ export function moduleProgress(
 }
 
 /**
+ * Progression gate: only the first three modules are open at the start.
+ * Beyond that, one more module opens for every module completed — "completed"
+ * meaning every exercise in it has at least one attempt (the same definition
+ * moduleProgress's completedCount uses, so a module reads as unlocked here at
+ * exactly the point its own progress bar reads 100% complete).
+ *
+ * Independent of Pro — see isModuleUnlocked in lib/entitlement, which stays
+ * separate. A module is genuinely open only once both gates pass.
+ */
+export function isModuleUnlockedByProgress(progress: Progress, moduleId: ModuleId): boolean {
+  const learningModule = MODULES.find((m) => m.id === moduleId);
+  if (!learningModule) return true;
+  if (learningModule.order <= 3) return true;
+  const completedCount = MODULES.filter((m) => {
+    const mp = moduleProgress(progress, m.id);
+    return mp.total > 0 && mp.completedCount === mp.total;
+  }).length;
+  return learningModule.order <= 3 + completedCount;
+}
+
+/**
+ * Short, factual reason a progression-locked module is still closed — names
+ * the earliest module (by order) that still needs finishing. Only meaningful
+ * when isModuleUnlockedByProgress is false for this module; returns null
+ * otherwise (nothing to explain).
+ */
+export function moduleLockReason(progress: Progress, moduleId: ModuleId): string | null {
+  if (isModuleUnlockedByProgress(progress, moduleId)) return null;
+  const next = MODULES.find((m) => {
+    const mp = moduleProgress(progress, m.id);
+    return mp.total > 0 && mp.completedCount < mp.total;
+  });
+  return next ? `Finish ${next.name} to unlock` : null;
+}
+
+/**
  * Human-readable module status for the home list and module header.
  * Mastered (every rep >=70) → All reps done → In progress → Start module.
  */
@@ -137,12 +173,17 @@ export function recommendNext(
 
   // Only ever recommend exercises the user can actually open. Unmapped
   // exercises (none today) are treated as accessible so nothing silently hides.
-  // Both gates apply: the module must be unlocked AND the exercise must be
-  // next in its module's own sequence (or already attempted).
+  // All three gates apply: the module must be unlocked by Pro AND by
+  // progression, AND the exercise must be next in its module's own sequence
+  // (or already attempted).
   const pool = EXERCISES.filter((ex) => {
     const mod = moduleForExercise(ex.id);
     if (!mod) return true;
-    return isModuleUnlocked({ pro, order: mod.order }) && isExerciseUnlockedInModule(progress, mod.id, ex.id);
+    return (
+      isModuleUnlocked({ pro, order: mod.order }) &&
+      isModuleUnlockedByProgress(progress, mod.id) &&
+      isExerciseUnlockedInModule(progress, mod.id, ex.id)
+    );
   });
 
   // ── Priority 1: Weakest attempted exercise, >=1 day old, score < 60 ──

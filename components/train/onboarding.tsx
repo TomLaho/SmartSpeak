@@ -179,6 +179,13 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
             <p className="mt-4 text-xs text-white/45">
               You start in <span className="font-semibold text-white/70">Command Presence</span> — the
               foundation every one of these moments is built on.
+              {targetModule && targetModule.order > 3 && (
+                <>
+                  {' '}
+                  <span className="font-semibold text-white/70">{targetModule.name}</span> unlocks as you
+                  complete the modules before it.
+                </>
+              )}
             </p>
             <button
               onClick={finish}
