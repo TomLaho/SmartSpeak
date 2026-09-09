@@ -16,7 +16,7 @@
  *   4. Fallback to EXERCISES[0].
  */
 
-import { EXERCISES, exercisesByModule, moduleForExercise, type Exercise, type ModuleId } from './exercises';
+import { EXERCISES, exercisesByModule, moduleForExercise, FREE_PLAY_ID, type Exercise, type ModuleId } from './exercises';
 import { isModuleUnlocked } from './entitlement';
 import { dayKey, type Progress } from './local-store';
 
@@ -26,6 +26,32 @@ import { dayKey, type Progress } from './local-store';
 export function isMastered(progress: Progress, exerciseId: string): boolean {
   const ex = progress.exercises[exerciseId];
   return !!ex && ex.bestScore >= 70;
+}
+
+/**
+ * Whether an exercise is open to tap *within its own module's sequence*.
+ *
+ * Purely about ordering — independent of the Pro/module-level gating in
+ * lib/entitlement.ts, which stays exactly as it is. Both gates must pass
+ * before an exercise is actually playable.
+ *
+ * Free play is never part of a module sequence (see FREE_PLAY_ID in
+ * lib/exercises) and is always unlocked. An already-attempted exercise stays
+ * open forever so replay keeps working, even if it was attempted out of
+ * order. Otherwise an exercise unlocks once every exercise before it in the
+ * module's own order has at least one attempt.
+ */
+export function isExerciseUnlockedInModule(
+  progress: Progress,
+  moduleId: ModuleId,
+  exerciseId: string
+): boolean {
+  if (exerciseId === FREE_PLAY_ID) return true;
+  if ((progress.exercises[exerciseId]?.attempts ?? 0) > 0) return true;
+  const exercises = exercisesByModule(moduleId);
+  const index = exercises.findIndex((e) => e.id === exerciseId);
+  if (index === -1) return true; // not part of this module's sequence
+  return exercises.slice(0, index).every((e) => (progress.exercises[e.id]?.attempts ?? 0) > 0);
 }
 
 // ─────────────────── Module helpers ───────────────────
@@ -111,9 +137,12 @@ export function recommendNext(
 
   // Only ever recommend exercises the user can actually open. Unmapped
   // exercises (none today) are treated as accessible so nothing silently hides.
+  // Both gates apply: the module must be unlocked AND the exercise must be
+  // next in its module's own sequence (or already attempted).
   const pool = EXERCISES.filter((ex) => {
     const mod = moduleForExercise(ex.id);
-    return !mod || isModuleUnlocked({ pro, order: mod.order });
+    if (!mod) return true;
+    return isModuleUnlocked({ pro, order: mod.order }) && isExerciseUnlockedInModule(progress, mod.id, ex.id);
   });
 
   // ── Priority 1: Weakest attempted exercise, >=1 day old, score < 60 ──

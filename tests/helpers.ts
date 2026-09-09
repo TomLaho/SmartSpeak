@@ -21,6 +21,14 @@ class MemoryStorage {
   clear(): void {
     this.map.clear();
   }
+  // Mirrors the real Storage interface's enumeration API — code under test
+  // (the "reset all progress" prefix sweep) walks localStorage this way.
+  get length(): number {
+    return this.map.size;
+  }
+  key(index: number): string | null {
+    return [...this.map.keys()][index] ?? null;
+  }
 }
 
 /** Install a fresh `window.localStorage`. Call in beforeEach for isolation. */

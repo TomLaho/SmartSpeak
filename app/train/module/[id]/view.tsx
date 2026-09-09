@@ -23,7 +23,13 @@ import {
   isModuleUnlocked,
   PRO_PRICE,
 } from '@/lib/entitlement';
-import { nextInModule, moduleProgress, moduleStatusLabel, isMastered } from '@/lib/selection';
+import {
+  nextInModule,
+  moduleProgress,
+  moduleStatusLabel,
+  isMastered,
+  isExerciseUnlockedInModule,
+} from '@/lib/selection';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -93,6 +99,9 @@ export default function ModulePage({ params }: { params: { id: string } }) {
       distinctAttempted,
     });
     if (moduleLocked || !accessible) return 'locked';
+    // Both gates apply: the module (checked above) and the exercise's own
+    // position in the module's sequence.
+    if (progress && !isExerciseUnlockedInModule(progress, moduleId, exerciseId)) return 'upcoming';
     return exerciseId === next.id ? 'current' : 'upcoming';
   }
 
@@ -320,45 +329,54 @@ function StepCard({
       ? `Unlock with Pro · ${PRO_PRICE}`
       : exercise.summary;
 
-  return (
-    <Link
-      href={href}
-      className={cn(
-        'mb-3 min-w-0 flex-1 rounded-2xl border px-4 py-3 transition-colors active:scale-[0.99]',
-        isLast && 'mb-0',
-        state === 'current'
-          ? 'border-spotlight/40 bg-spotlight/10 hover:bg-spotlight/15'
-          : state === 'upcoming' || state === 'locked'
-          ? 'border-white/10 bg-white/[0.03] hover:bg-white/[0.06]'
-          : 'border-white/10 bg-white/[0.05] hover:bg-white/[0.08]'
-      )}
-    >
-      <div className="flex items-center gap-3">
-        <div className="min-w-0 flex-1">
-          <p
-            className={cn(
-              'truncate text-sm font-semibold',
-              state === 'upcoming' || state === 'locked' ? 'text-white/55' : 'text-white'
-            )}
-          >
-            {exercise.title}
-          </p>
-          <p className="mt-0.5 line-clamp-2 text-xs text-white/45">{subtitle}</p>
-        </div>
-        {typeof best === 'number' && (state === 'done' || state === 'mastered') && (
-          <p
-            className="shrink-0 text-sm font-bold"
-            style={{ color: state === 'mastered' ? '#FFC857' : accent }}
-          >
-            {best}
-          </p>
-        )}
-        {state === 'current' && (
-          <span className="shrink-0 rounded-full bg-spotlight px-3 py-1 text-xs font-bold text-ink">
-            Go
-          </span>
-        )}
+  const className = cn(
+    'mb-3 min-w-0 flex-1 rounded-2xl border px-4 py-3 transition-colors active:scale-[0.99]',
+    isLast && 'mb-0',
+    state === 'current'
+      ? 'border-spotlight/40 bg-spotlight/10 hover:bg-spotlight/15'
+      : state === 'upcoming' || state === 'locked'
+      ? 'border-white/10 bg-white/[0.03] hover:bg-white/[0.06]'
+      : 'border-white/10 bg-white/[0.05] hover:bg-white/[0.08]'
+  );
+
+  const content = (
+    <div className="flex items-center gap-3">
+      <div className="min-w-0 flex-1">
+        <p
+          className={cn(
+            'truncate text-sm font-semibold',
+            state === 'upcoming' || state === 'locked' ? 'text-white/55' : 'text-white'
+          )}
+        >
+          {exercise.title}
+        </p>
+        <p className="mt-0.5 line-clamp-2 text-xs text-white/45">{subtitle}</p>
       </div>
+      {typeof best === 'number' && (state === 'done' || state === 'mastered') && (
+        <p
+          className="shrink-0 text-sm font-bold"
+          style={{ color: state === 'mastered' ? '#FFC857' : accent }}
+        >
+          {best}
+        </p>
+      )}
+      {state === 'current' && (
+        <span className="shrink-0 rounded-full bg-spotlight px-3 py-1 text-xs font-bold text-ink">
+          Go
+        </span>
+      )}
+    </div>
+  );
+
+  // Upcoming steps aren't next in the module's sequence yet — not a Link, so
+  // there's nowhere for a tap (or a stray keyboard focus) to send them.
+  if (state === 'upcoming') {
+    return <div className={className}>{content}</div>;
+  }
+
+  return (
+    <Link href={href} className={className}>
+      {content}
     </Link>
   );
 }

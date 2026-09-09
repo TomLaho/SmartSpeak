@@ -7,11 +7,13 @@ import { XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
 import {
   EXERCISES,
   getExercise,
+  moduleForExercise,
   pickVariation,
   BENCHMARKS,
   countWords,
   expectedSeconds,
 } from '@/lib/exercises';
+import { isExerciseUnlockedInModule } from '@/lib/selection';
 import { analyzeAudioInWorker, type AudioMetrics } from '@/lib/audio-analysis';
 import { coachAttempt, paceWpm, type CoachResult } from '@/lib/coach';
 import { loadCalibration, toCalibrationInput } from '@/lib/calibration';
@@ -237,6 +239,21 @@ export default function ExercisePlayer({ params }: { params: { id: string } }) {
     refreshEntitlement().then((pro) => {
       if (!canAccessExercise({ pro, alreadyAttempted, distinctAttempted })) router.replace('/train/unlock');
     });
+  }, [exercise, router]);
+
+  // Gate deep links to an exercise that isn't next in its module's own
+  // sequence yet — a stale link, browser history entry, or the Android back
+  // stack can land here directly. This isn't a paywall (the exercise isn't
+  // locked, just not up yet), so it sends the user to the module page rather
+  // than /train/unlock.
+  useEffect(() => {
+    if (!exercise || exercise.id === FREE_PLAY_ID) return;
+    const learningModule = moduleForExercise(exercise.id);
+    if (!learningModule) return;
+    const progress = loadProgress();
+    if (!isExerciseUnlockedInModule(progress, learningModule.id, exercise.id)) {
+      router.replace(`/train/module/${learningModule.id}`);
+    }
   }, [exercise, router]);
 
   const finishAnalysis = useCallback(

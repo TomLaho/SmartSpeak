@@ -285,4 +285,27 @@ describe('resetProgress', () => {
     expect(cleared.todayDay).toBe('2026-03-08');
     expect(loadProgress().streak).toBe(0);
   });
+
+  it('sweeps every smartspeak.* key — achievements, setup flags and progress together', () => {
+    const storage = (globalThis as any).window.localStorage;
+    // Seed keys the way their owning modules would, without importing them
+    // (that would risk the exact circular import the prefix sweep avoids).
+    storage.setItem('smartspeak.achievements.v1', JSON.stringify(['first-rep']));
+    storage.setItem('smartspeak.onboarded.v1', '1');
+    storage.setItem('smartspeak.reminderSet.v1', '1');
+    storage.setItem('smartspeak.moment.v1', 'pitch');
+    storage.setItem('smartspeak.pro.v1', '1');
+    storage.setItem('unrelated.other-app.v1', 'should-survive');
+    rep();
+
+    resetProgress();
+
+    expect(storage.getItem('smartspeak.achievements.v1')).toBeNull();
+    expect(storage.getItem('smartspeak.onboarded.v1')).toBeNull();
+    expect(storage.getItem('smartspeak.reminderSet.v1')).toBeNull();
+    expect(storage.getItem('smartspeak.moment.v1')).toBeNull();
+    expect(storage.getItem('smartspeak.pro.v1')).toBeNull();
+    // A prefix sweep must not reach outside its own namespace.
+    expect(storage.getItem('unrelated.other-app.v1')).toBe('should-survive');
+  });
 });

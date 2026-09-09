@@ -88,16 +88,29 @@ function bell(value: number, ideal: number, span: number): number {
 }
 
 /**
- * Plateau score: 100 anywhere inside [lo, hi], decaying to 0 at lo-span / hi+span.
+ * Plateau score: two-tier inside [lo, hi], decaying from 88 toward 0 outside it.
  *
  * Most delivery metrics have a *range* that reads as good, not a single ideal
- * value. A triangular curve around one point quietly punishes perfectly good
- * speech for missing an arbitrary target — 150 wpm is not worse than 145 wpm.
+ * value, so a triangular curve around one point would quietly punish perfectly
+ * good speech for missing an arbitrary target — 150 wpm is not worse than 145
+ * wpm. But the whole band being full marks made merely-acceptable delivery
+ * indistinguishable from genuinely good delivery, which was the single
+ * biggest source of score inflation. So only the centre quarter-to-quarter of
+ * the band scores 100; the rest of the band scales 88→100 toward the centre.
+ * Outside the band, decay continues from that same 88 down toward 0 across
+ * `span`, so the edge of "acceptable" and the start of "outside acceptable"
+ * don't jump.
  */
 function plateau(value: number, lo: number, hi: number, span: number): number {
-  if (value >= lo && value <= hi) return 100;
+  const mid = (lo + hi) / 2;
+  const quarter = (hi - lo) / 4;
+  if (value >= mid - quarter && value <= mid + quarter) return 100;
+  if (value >= lo && value <= hi) {
+    const distanceFromCore = value < mid ? mid - quarter - value : value - (mid + quarter);
+    return clamp(100 - (distanceFromCore / quarter) * 12);
+  }
   const distance = value < lo ? lo - value : value - hi;
-  return clamp(100 - (distance / span) * 100);
+  return clamp(88 - (distance / span) * 88);
 }
 
 function clamp(n: number, lo = 0, hi = 100): number {
@@ -209,7 +222,10 @@ function scoreFillers(
     return dim('fillers', 70, 'No audio timing — record a take to measure filler rate.', false);
   }
   const perMin = total / speakingMin;
-  const score = clamp(100 - perMin * 6);
+  // 12 points per hesitation/min: 2/min → 76, 4/min → 52, 6/min → 28. The old
+  // coefficient (6) let 5 hesitations a minute still score 70 — far too
+  // forgiving for something the listener notices every 12 seconds.
+  const score = clamp(100 - perMin * 12);
 
   let detail: string;
   if (total === 0) {
@@ -432,22 +448,48 @@ export function coachAttempt(
     }
   }
 
-  // Overall = straight (unweighted) average of every dimension shown on the
-  // results screen, so the headline number always reconciles with the
-  // breakdown the user can see. Falls back to all scores if none are measured.
+  // Overall = weighted average with focus dimensions counted 2x the extras,
+  // so the headline number reflects what the rep was actually practising
+  // rather than getting outvoted by dimensions that were merely along for
+  // the ride. Falls back to all scores if none are measured; never divides
+  // by zero.
   const focusScores = scores.filter((s) => focus.includes(s.dimension));
   const measured = scores.filter((s) => s.measured);
   const base = measured.length ? measured : scores;
-  const overallScore = base.length === 0 ? 0 : clamp(base.reduce((a, s) => a + s.score, 0) / base.length);
+  const weightOf = (s: DimensionScore) => (focus.includes(s.dimension) ? 2 : 1);
+  const totalWeight = base.reduce((a, s) => a + weightOf(s), 0);
+  let overallScore =
+    totalWeight === 0 ? 0 : clamp(base.reduce((a, s) => a + s.score * weightOf(s), 0) / totalWeight);
+
+  // Under 25 words there isn't enough signal to justify a confident score —
+  // a near-empty take must not be able to coast on a couple of strong
+  // dimensions (e.g. a fast, well-paced "um").
+  const SHORT_TAKE_WORDS = 25;
+  const isShortTake = wordCount < SHORT_TAKE_WORDS;
+  if (isShortTake) overallScore = Math.min(overallScore, 55);
 
   const ranked = [...scores].filter((s) => s.measured).sort((a, b) => b.score - a.score);
   const strengths = ranked.filter((s) => s.score >= 75).slice(0, 3).map((s) => s.detail);
   const improvements = ranked.filter((s) => s.score < 70).reverse().slice(0, 3).map((s) => s.detail);
 
+  // The per-dimension scores above are untouched by the short-take cap, so on
+  // their own they can look fine (or even blank the improvements list) while
+  // the headline score sits at 55 — that would read as a bug, not a signal.
+  // Say plainly why the score is capped instead of leaving it unexplained.
+  const SHORT_TAKE_NOTE = `Only ${wordCount} word${wordCount === 1 ? '' : 's'} — too little to score with confidence. Say more next take.`;
+  if (isShortTake) {
+    improvements.unshift(SHORT_TAKE_NOTE);
+    improvements.length = Math.min(improvements.length, 3);
+  }
+
   // Fallbacks so the screen is never empty.
   if (strengths.length === 0 && ranked.length) strengths.push(ranked[0].detail);
   const weakest = ranked.length ? ranked[ranked.length - 1] : focusScores[0];
-  const quickWin = weakest ? quickWinFor(weakest.dimension) : 'Record one more take and compare your scores.';
+  const quickWin = isShortTake
+    ? 'Next take: keep talking — a full take gives the coach enough to score fairly.'
+    : weakest
+    ? quickWinFor(weakest.dimension)
+    : 'Record one more take and compare your scores.';
 
   // "One thing" — the single deliberate-practice cue for the next rep.
   const primaryDimension = weakest?.dimension;

@@ -214,7 +214,32 @@ export function recordAttempt(input: RecordInput): {
   return { progress: save(progress), streakIncreased, goalReached, newAchievements };
 }
 
+/**
+ * Wipe the app back to genuine first-run.
+ *
+ * Storage keys are spread across modules — progress/daily-goal/last-challenge
+ * here, plus achievements, the setup checklist, calibration, the chosen
+ * moment and Pro entitlement elsewhere — but they all share the
+ * `smartspeak.` prefix. A prefix sweep clears every one of them without this
+ * module needing to know about the others (which would risk a circular
+ * import), and without a hand-maintained key list that silently rots the
+ * next time someone adds a key. Clearing smartspeak.pro.* is safe:
+ * entitlement.ts re-grants Pro via its pre-launch grace on the next
+ * refreshEntitlement() call.
+ */
 export function resetProgress(): Progress {
+  if (typeof window !== 'undefined') {
+    try {
+      const keys: string[] = [];
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (key && key.startsWith('smartspeak.')) keys.push(key);
+      }
+      keys.forEach((key) => window.localStorage.removeItem(key));
+    } catch {
+      /* storage full / unavailable — degrade silently */
+    }
+  }
   return save({ ...emptyProgress(), todayDay: dayKey() });
 }
 

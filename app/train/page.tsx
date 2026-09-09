@@ -15,6 +15,7 @@ import {
   MODULES,
   FREE_PLAY_ID,
   FREE_PLAY,
+  moduleForExercise,
   type ModuleId,
 } from '@/lib/exercises';
 import {
@@ -33,7 +34,7 @@ import {
   FREE_EXERCISE_LIMIT,
   PRO_PRICE,
 } from '@/lib/entitlement';
-import { recommendNext, moduleProgress, moduleStatusLabel } from '@/lib/selection';
+import { recommendNext, moduleProgress, moduleStatusLabel, isExerciseUnlockedInModule } from '@/lib/selection';
 import { loadMoment, getMoment } from '@/lib/personalise';
 import {
   setupState,
@@ -79,7 +80,11 @@ export default function TrainHome() {
       // the first exercise they haven't touched — the same fallback the up-next
       // card uses before there's any history to reason from.
       const firstRep =
-        EXERCISES.find((e) => (p.exercises[e.id]?.attempts ?? 0) === 0) ?? EXERCISES[0];
+        EXERCISES.find((e) => {
+          if ((p.exercises[e.id]?.attempts ?? 0) > 0) return false;
+          const mod = moduleForExercise(e.id);
+          return !mod || isExerciseUnlockedInModule(p, mod.id, e.id);
+        }) ?? EXERCISES[0];
       setSetup(
         setupState({
           // The moment itself, not the onboarded flag: an account onboarded
@@ -121,7 +126,15 @@ export default function TrainHome() {
   const recommended = progress && progress.history.length > 0
     ? recommendNext(progress, pro)
     : null;
-  const upNext = recommended?.exercise ?? EXERCISES.find((e) => !attempted(e.id)) ?? EXERCISES[0];
+  const upNext =
+    recommended?.exercise ??
+    EXERCISES.find((e) => {
+      if (attempted(e.id)) return false;
+      if (!progress) return true;
+      const mod = moduleForExercise(e.id);
+      return !mod || isExerciseUnlockedInModule(progress, mod.id, e.id);
+    }) ??
+    EXERCISES[0];
   // Before there's any history to reason from, the reason is the user's own
   // stated goal — the first rep should visibly connect to what they signed up for.
   const upNextReason =

@@ -29,17 +29,52 @@ describe('pace scoring band', () => {
     return r.scores.find((s) => s.dimension === 'pace')!.score;
   };
 
-  it('gives full marks anywhere inside the comfortable band', () => {
+  it('gives full marks only in the core of the band', () => {
     // A plateau, not a single ideal: 150 wpm must not be penalised against 145.
-    expect(paceOf(125)).toBe(100);
-    expect(paceOf(145)).toBe(100);
-    expect(paceOf(165)).toBe(100);
+    // But the whole band is no longer full marks — only its centre is.
+    expect(paceOf(145)).toBe(100); // core (mid = 145, quarter = 10 → [135, 155])
+    expect(paceOf(135)).toBe(100);
+    expect(paceOf(155)).toBe(100);
   });
 
-  it('decays outside the band in both directions', () => {
-    expect(paceOf(100)).toBeLessThan(100);
-    expect(paceOf(200)).toBeLessThan(100);
+  it('scores merely-acceptable delivery at the band edge below full marks', () => {
+    // Inside [lo, hi] but outside the core: 88 at the edge, rising to 100 at
+    // the core boundary. Being within the acceptable band is no longer the
+    // same as being ideal.
+    expect(paceOf(125)).toBe(88);
+    expect(paceOf(165)).toBe(88);
+    expect(paceOf(130)).toBeGreaterThan(88);
+    expect(paceOf(130)).toBeLessThan(100);
+  });
+
+  it('decays outside the band in both directions, continuing from 88', () => {
+    expect(paceOf(124)).toBeLessThan(88);
+    expect(paceOf(166)).toBeLessThan(88);
     expect(paceOf(100)).toBeGreaterThan(paceOf(60));
+  });
+});
+
+describe('filler scoring', () => {
+  const fillersExercise = getExercise('d3-fillers') as Exercise;
+  const scoreAt = (perMin: number) => {
+    // speakingSec = 60 → speakingMin = 1, so filledPauseCount == perMin exactly.
+    const r = coachAttempt(
+      fillersExercise,
+      SPEECH,
+      audioMetrics({ speakingSec: 60, filledPauseCount: perMin })
+    );
+    return r.scores.find((s) => s.dimension === 'fillers')!.score;
+  };
+
+  it('applies the steeper 12-point-per-minute rate', () => {
+    expect(scoreAt(2)).toBe(76);
+    expect(scoreAt(4)).toBe(52);
+    expect(scoreAt(6)).toBe(28);
+  });
+
+  it('no longer lets 5 hesitations a minute pass as a decent score', () => {
+    // Under the old coefficient (6) this scored 70 — clearly too forgiving.
+    expect(scoreAt(5)).toBeLessThan(50);
   });
 });
 
@@ -96,11 +131,49 @@ describe('read-aloud accuracy', () => {
 });
 
 describe('overall score', () => {
-  it('is the mean of the measured dimensions the user can see', () => {
+  it('is the focus-weighted mean of the measured dimensions the user can see', () => {
     const result = coachAttempt(spoken, SPEECH, audioMetrics());
     const measured = result.scores.filter((s) => s.measured);
-    const mean = Math.round(measured.reduce((a, s) => a + s.score, 0) / measured.length);
-    expect(result.overallScore).toBe(mean);
+    const focus = scorableDimensions(spoken).filter((d) => spoken.focus.includes(d));
+    const weightOf = (d: string) => (focus.includes(d as (typeof focus)[number]) ? 2 : 1);
+    const totalWeight = measured.reduce((a, s) => a + weightOf(s.dimension), 0);
+    const weightedMean = Math.round(
+      measured.reduce((a, s) => a + s.score * weightOf(s.dimension), 0) / totalWeight
+    );
+    expect(result.overallScore).toBe(weightedMean);
+  });
+
+  it('weights focus dimensions 2x so a tanked extra moves the overall less than a plain mean would', () => {
+    // spoken (d3-fillers).focus is fillers/pauses/pace — energy is an "extra".
+    // Keep the transcript identical and only wreck energy via the audio
+    // metrics. If focus really counts double, the overall must land above the
+    // plain (unweighted) mean, since the tanked extra is now under-weighted
+    // relative to a straight average.
+    const result = coachAttempt(spoken, SPEECH, audioMetrics({ energy: { meanDb: -22, dynamicRangeDb: 1 } }));
+    const measured = result.scores.filter((s) => s.measured);
+    const plainMean = measured.reduce((a, s) => a + s.score, 0) / measured.length;
+    const energyScore = measured.find((s) => s.dimension === 'energy')!.score;
+    expect(energyScore).toBeLessThan(plainMean);
+    expect(result.overallScore).toBeGreaterThan(Math.round(plainMean));
+  });
+
+  it('caps a near-empty take regardless of how its measured dimensions score', () => {
+    const result = coachAttempt(spoken, 'great point really good stuff', audioMetrics());
+    expect(result.wordCount).toBeLessThan(25);
+    expect(result.overallScore).toBeLessThanOrEqual(55);
+  });
+
+  it('says why the score is capped when the take is too short', () => {
+    const result = coachAttempt(spoken, 'great point really good stuff', audioMetrics());
+    expect(result.improvements.some((i) => /too little to score/i.test(i))).toBe(true);
+    expect(result.quickWin).toMatch(/keep talking/i);
+  });
+
+  it('does not cap a full-length take even at 25+ words', () => {
+    const result = coachAttempt(spoken, SPEECH, audioMetrics());
+    expect(result.wordCount).toBeGreaterThanOrEqual(25);
+    // SPEECH is a strong, well-formed take — the cap must not touch it.
+    expect(result.overallScore).toBeGreaterThan(55);
   });
 
   it('stays within 0–100 for degenerate input', () => {

@@ -9,8 +9,9 @@ import {
   moduleStatusLabel,
   nextInModule,
   isMastered,
+  isExerciseUnlockedInModule,
 } from '@/lib/selection';
-import { MODULES, exercisesByModule, moduleForExercise, type ModuleId } from '@/lib/exercises';
+import { MODULES, exercisesByModule, moduleForExercise, FREE_PLAY_ID, type ModuleId } from '@/lib/exercises';
 import { isModuleUnlocked } from '@/lib/entitlement';
 import type { ExerciseProgress, Progress } from '@/lib/local-store';
 
@@ -152,6 +153,32 @@ describe('nextInModule', () => {
   it('replays the first rep for a fully mastered module', () => {
     const all = Object.fromEntries(freeExercises.map((e) => [e.id, ex({ bestScore: 95 })]));
     expect(nextInModule(progressWith(all), id).id).toBe(freeExercises[0].id);
+  });
+});
+
+describe('isExerciseUnlockedInModule', () => {
+  const id = freeModule.id as ModuleId;
+
+  it('locks the second exercise until the first has an attempt', () => {
+    expect(isExerciseUnlockedInModule(progressWith({}), id, freeExercises[1].id)).toBe(false);
+    const started = progressWith({ [freeExercises[0].id]: ex() });
+    expect(isExerciseUnlockedInModule(started, id, freeExercises[1].id)).toBe(true);
+  });
+
+  it('keeps an attempted exercise unlocked even if a later one is attempted out of order', () => {
+    // Only the third exercise has an attempt — a state that should never
+    // arise through normal play, but a stale deep link could still hit it.
+    const outOfOrder = progressWith({ [freeExercises[2].id]: ex() });
+    expect(isExerciseUnlockedInModule(outOfOrder, id, freeExercises[2].id)).toBe(true);
+    expect(isExerciseUnlockedInModule(outOfOrder, id, freeExercises[1].id)).toBe(false);
+  });
+
+  it('always unlocks free play', () => {
+    expect(isExerciseUnlockedInModule(progressWith({}), id, FREE_PLAY_ID)).toBe(true);
+  });
+
+  it('unlocks the first exercise with no progress at all', () => {
+    expect(isExerciseUnlockedInModule(progressWith({}), id, freeExercises[0].id)).toBe(true);
   });
 });
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ClockIcon,
   ShieldCheckIcon,
@@ -24,6 +25,7 @@ import { cn } from '@/lib/utils';
 const REP_OPTIONS = [1, 2, 3] as const;
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [progress, setProgress] = useState<Progress | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [pro, setPro] = useState(false);
@@ -281,12 +283,15 @@ export default function ProfilePage() {
           </Button>
         ) : (
           <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4">
-            <p className="text-sm text-white/80">Reset your streak, XP and history? This can&apos;t be undone.</p>
+            <p className="text-sm text-white/80">
+              Reset your streak, XP, history, achievements and setup — back to a clean first-run? This can&apos;t be undone.
+            </p>
             <div className="mt-3 flex gap-2">
               <Button
                 onClick={() => {
                   setProgress(resetProgress());
                   setConfirming(false);
+                  router.push('/train');
                 }}
                 className="flex-1 bg-red-500 hover:bg-red-400"
               >
