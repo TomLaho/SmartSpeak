@@ -34,6 +34,8 @@ export interface DimensionScore {
 export interface CoachResult {
   overallScore: number;
   scores: DimensionScore[];
+  /** Six composite scores grouping the dimensions above for the results screen. */
+  facets: FacetScore[];
   strengths: string[];
   improvements: string[];
   quickWin: string;
@@ -48,6 +50,86 @@ export interface CoachResult {
   primaryCue?: string;
   /** Which dimension the primaryCue addresses. */
   primaryDimension?: Dimension;
+}
+
+/**
+ * Six-facet grouping of the ten dimensions, for a results screen that reads
+ * in one glance (and gives the UI a natural hexagon). Presentation layer only
+ * — computed on top of the existing per-dimension scores, never replacing
+ * them, so exercise definitions and stored history are untouched.
+ */
+export type Facet = 'pace' | 'voice' | 'fluency' | 'opening' | 'structure' | 'substance';
+
+export interface FacetScore {
+  facet: Facet;
+  label: string;
+  score: number; // 0-100
+  tier: 'green' | 'amber' | 'red';
+  measured: boolean;
+  focus: boolean;
+  detail: string;
+  parts: DimensionScore[];
+}
+
+const FACET_LABELS: Record<Facet, string> = {
+  pace: 'Pace',
+  voice: 'Voice',
+  fluency: 'Fluency',
+  opening: 'Opening',
+  structure: 'Structure',
+  substance: 'Substance',
+};
+
+// Canonical facet → dimension grouping. See task spec: pace/pauses → Pace;
+// intonation/energy → Voice; fillers/accuracy → Fluency; hook → Opening;
+// structure → Structure; clarity/concreteness → Substance.
+const FACET_DIMENSIONS: Record<Facet, Dimension[]> = {
+  pace: ['pace', 'pauses'],
+  voice: ['intonation', 'energy'],
+  fluency: ['fillers', 'accuracy'],
+  opening: ['hook'],
+  structure: ['structure'],
+  substance: ['clarity', 'concreteness'],
+};
+
+const FACET_ORDER: Facet[] = ['pace', 'voice', 'fluency', 'opening', 'structure', 'substance'];
+
+/**
+ * Groups the already-computed dimension scores into the six facets. A facet
+ * is omitted entirely when none of its dimensions were scorable for this
+ * exercise (e.g. `opening` on a read-aloud rep, `accuracy` on a topic rep).
+ */
+function buildFacets(scores: DimensionScore[], focus: Dimension[]): FacetScore[] {
+  const built: FacetScore[] = [];
+  for (const facet of FACET_ORDER) {
+    const parts = scores.filter((s) => FACET_DIMENSIONS[facet].includes(s.dimension));
+    if (parts.length === 0) continue;
+    const measuredParts = parts.filter((p) => p.measured);
+    const basis = measuredParts.length ? measuredParts : parts;
+    const score = clamp(basis.reduce((a, p) => a + p.score, 0) / basis.length);
+    const tier: 'green' | 'amber' | 'red' = score >= 75 ? 'green' : score >= 55 ? 'amber' : 'red';
+    // The card should say the single most useful thing, not concatenate: the
+    // weakest part when there's room to improve, the strongest when it's
+    // already good.
+    const detail =
+      tier === 'green'
+        ? basis.reduce((a, p) => (p.score > a.score ? p : a)).detail
+        : basis.reduce((a, p) => (p.score < a.score ? p : a)).detail;
+    built.push({
+      facet,
+      label: FACET_LABELS[facet],
+      score,
+      tier,
+      measured: measuredParts.length > 0,
+      focus: parts.some((p) => focus.includes(p.dimension)),
+      detail,
+      parts,
+    });
+  }
+  // Focus facets first, same as the dimension ordering above.
+  const focusFacets = built.filter((f) => f.focus);
+  const rest = built.filter((f) => !f.focus);
+  return [...focusFacets, ...rest];
 }
 
 // Non-vocalised fillers we can only catch in the transcript. The vocalised
@@ -88,29 +170,30 @@ function bell(value: number, ideal: number, span: number): number {
 }
 
 /**
- * Plateau score: two-tier inside [lo, hi], decaying from 88 toward 0 outside it.
+ * Plateau score: two-tier inside [lo, hi], decaying from 80 toward 0 outside it.
  *
  * Most delivery metrics have a *range* that reads as good, not a single ideal
  * value, so a triangular curve around one point would quietly punish perfectly
  * good speech for missing an arbitrary target — 150 wpm is not worse than 145
- * wpm. But the whole band being full marks made merely-acceptable delivery
- * indistinguishable from genuinely good delivery, which was the single
- * biggest source of score inflation. So only the centre quarter-to-quarter of
- * the band scores 100; the rest of the band scales 88→100 toward the centre.
- * Outside the band, decay continues from that same 88 down toward 0 across
- * `span`, so the edge of "acceptable" and the start of "outside acceptable"
- * don't jump.
+ * wpm. But a whole-quarter core scoring full marks (with a soft 88 edge) still
+ * let merely-acceptable delivery read as genuinely good — the single biggest
+ * source of score inflation. So only the centre *eighth-to-eighth* of the band
+ * (a quarter of its width) scores 100; the rest of the band scales 80→100
+ * toward the centre. Outside the band, decay continues from that same 80 down
+ * toward 0 across `span`, so the edge of "acceptable" and the start of
+ * "outside acceptable" don't jump.
  */
 function plateau(value: number, lo: number, hi: number, span: number): number {
   const mid = (lo + hi) / 2;
-  const quarter = (hi - lo) / 4;
-  if (value >= mid - quarter && value <= mid + quarter) return 100;
+  const coreHalf = (hi - lo) / 8;
+  if (value >= mid - coreHalf && value <= mid + coreHalf) return 100;
   if (value >= lo && value <= hi) {
-    const distanceFromCore = value < mid ? mid - quarter - value : value - (mid + quarter);
-    return clamp(100 - (distanceFromCore / quarter) * 12);
+    const distanceFromCore = value < mid ? mid - coreHalf - value : value - (mid + coreHalf);
+    const maxDistance = (hi - lo) / 2 - coreHalf; // core edge to band edge
+    return clamp(100 - (distanceFromCore / maxDistance) * 20);
   }
   const distance = value < lo ? lo - value : value - hi;
-  return clamp(88 - (distance / span) * 88);
+  return clamp(80 - (distance / span) * 80);
 }
 
 function clamp(n: number, lo = 0, hi = 100): number {
@@ -448,18 +531,22 @@ export function coachAttempt(
     }
   }
 
-  // Overall = weighted average with focus dimensions counted 2x the extras,
-  // so the headline number reflects what the rep was actually practising
-  // rather than getting outvoted by dimensions that were merely along for
-  // the ride. Falls back to all scores if none are measured; never divides
-  // by zero.
   const focusScores = scores.filter((s) => focus.includes(s.dimension));
-  const measured = scores.filter((s) => s.measured);
-  const base = measured.length ? measured : scores;
-  const weightOf = (s: DimensionScore) => (focus.includes(s.dimension) ? 2 : 1);
-  const totalWeight = base.reduce((a, s) => a + weightOf(s), 0);
+
+  // Facets group the ten dimensions into six for the results screen. The
+  // overall score is now computed one level up from facets rather than raw
+  // dimensions, with the same 2x-for-focus idea — otherwise a facet made of
+  // two dimensions (e.g. Voice) would silently outvote a facet made of one
+  // (e.g. Opening).
+  const facets = buildFacets(scores, focus);
+  const measuredFacets = facets.filter((f) => f.measured);
+  const facetBase = measuredFacets.length ? measuredFacets : facets;
+  const facetWeightOf = (f: FacetScore) => (f.focus ? 2 : 1);
+  const facetTotalWeight = facetBase.reduce((a, f) => a + facetWeightOf(f), 0);
   let overallScore =
-    totalWeight === 0 ? 0 : clamp(base.reduce((a, s) => a + s.score * weightOf(s), 0) / totalWeight);
+    facetTotalWeight === 0
+      ? 0
+      : clamp(facetBase.reduce((a, f) => a + f.score * facetWeightOf(f), 0) / facetTotalWeight);
 
   // Under 25 words there isn't enough signal to justify a confident score —
   // a near-empty take must not be able to coast on a couple of strong
@@ -468,14 +555,39 @@ export function coachAttempt(
   const isShortTake = wordCount < SHORT_TAKE_WORDS;
   if (isShortTake) overallScore = Math.min(overallScore, 55);
 
+  // A take that stops well short of the exercise's target length can't be
+  // judged as a full one, no matter how clean the dimensions that *were*
+  // measured come back — 16 seconds of a 45-second exercise is a fragment,
+  // not a fast, well-paced take. Guarded on both sides: no target to compare
+  // against, or no measurable speaking time (audio unavailable), means this
+  // can't be assessed and must never be the reason someone is marked down.
+  const hasTarget = typeof exercise.targetSeconds === 'number' && exercise.targetSeconds > 0;
+  const hasSpeakingTime = audio.speakingSec > 0;
+  let durationNote: string | undefined;
+  if (hasTarget && hasSpeakingTime) {
+    const completeness = audio.speakingSec / exercise.targetSeconds;
+    let durationCap: number | undefined;
+    if (completeness < 0.4) durationCap = 55;
+    else if (completeness < 0.7) durationCap = 72;
+    if (durationCap !== undefined) {
+      overallScore = Math.min(overallScore, durationCap);
+      durationNote = `${Math.round(audio.speakingSec)}s of a ${exercise.targetSeconds}s target — a part-take can't score like a full one.`;
+    }
+  }
+
   const ranked = [...scores].filter((s) => s.measured).sort((a, b) => b.score - a.score);
   const strengths = ranked.filter((s) => s.score >= 75).slice(0, 3).map((s) => s.detail);
   const improvements = ranked.filter((s) => s.score < 70).reverse().slice(0, 3).map((s) => s.detail);
 
-  // The per-dimension scores above are untouched by the short-take cap, so on
-  // their own they can look fine (or even blank the improvements list) while
-  // the headline score sits at 55 — that would read as a bug, not a signal.
-  // Say plainly why the score is capped instead of leaving it unexplained.
+  // The per-dimension scores above are untouched by the short-take/duration
+  // caps, so on their own they can look fine (or even blank the improvements
+  // list) while the headline score sits well below them — that would read as
+  // a bug, not a signal. Say plainly why the score is capped instead of
+  // leaving it unexplained.
+  if (durationNote) {
+    improvements.unshift(durationNote);
+    improvements.length = Math.min(improvements.length, 3);
+  }
   const SHORT_TAKE_NOTE = `Only ${wordCount} word${wordCount === 1 ? '' : 's'} — too little to score with confidence. Say more next take.`;
   if (isShortTake) {
     improvements.unshift(SHORT_TAKE_NOTE);
@@ -487,6 +599,8 @@ export function coachAttempt(
   const weakest = ranked.length ? ranked[ranked.length - 1] : focusScores[0];
   const quickWin = isShortTake
     ? 'Next take: keep talking — a full take gives the coach enough to score fairly.'
+    : durationNote
+    ? "Next take: keep going for the full length — a part-take can't show what you can do."
     : weakest
     ? quickWinFor(weakest.dimension)
     : 'Record one more take and compare your scores.';
@@ -499,7 +613,15 @@ export function coachAttempt(
   // Range: [0.6, 1.0] of base XP (score 0 → 60%, score 100 → 100%).
   const xpEarned = Math.round(exercise.xp * (0.6 + (overallScore / 100) * 0.4));
 
-  return { overallScore, scores, strengths, improvements, quickWin, wordCount, fillerCount, xpEarned, primaryCue, primaryDimension };
+  return { overallScore, scores, facets, strengths, improvements, quickWin, wordCount, fillerCount, xpEarned, primaryCue, primaryDimension };
+}
+
+/** Maps an overall score to the results-screen headline. */
+export function headlineFor(overallScore: number): string {
+  if (overallScore >= 92) return 'Outstanding!';
+  if (overallScore >= 80) return 'Great take!';
+  if (overallScore >= 62) return 'Solid effort';
+  return 'Good start — keep going';
 }
 
 function quickWinFor(d: Dimension): string {

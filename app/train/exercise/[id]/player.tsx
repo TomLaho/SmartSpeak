@@ -15,7 +15,7 @@ import {
 } from '@/lib/exercises';
 import { isExerciseUnlockedInModule } from '@/lib/selection';
 import { analyzeAudioInWorker, type AudioMetrics } from '@/lib/audio-analysis';
-import { coachAttempt, paceWpm, type CoachResult } from '@/lib/coach';
+import { coachAttempt, headlineFor, paceWpm, type CoachResult, type Facet } from '@/lib/coach';
 import { loadCalibration, toCalibrationInput } from '@/lib/calibration';
 import {
   transcribeOnDevice,
@@ -52,6 +52,7 @@ import { TierBadge } from '@/components/train/tier-badge';
 import { Celebration } from '@/components/train/celebration';
 import { AchievementToast } from '@/components/train/achievement-toast';
 import { DeliveryTimeline } from '@/components/train/delivery-timeline';
+import { ScoreRadar } from '@/components/train/score-radar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { Exercise, Dimension } from '@/lib/exercises';
@@ -945,14 +946,15 @@ function ResultsView({
   // Score ring color by tier.
   const scoreColor =
     result.overallScore >= 80 ? '#3DD68C' : result.overallScore >= 60 ? '#FFC857' : '#FFB454';
-  const headline =
-    result.overallScore >= 85
-      ? 'Outstanding!'
-      : result.overallScore >= 70
-      ? 'Great take!'
-      : result.overallScore >= 50
-      ? 'Solid effort'
-      : 'Good start — keep going';
+  const headline = headlineFor(result.overallScore);
+
+  // Fixed delivery-then-content order for the radar, independent of the
+  // focus-first order `result.facets` uses for the cards below.
+  const radarOrder: Facet[] = ['pace', 'voice', 'fluency', 'opening', 'structure', 'substance'];
+  const radarAxes = radarOrder
+    .map((f) => result.facets.find((fs) => fs.facet === f))
+    .filter((f): f is (typeof result.facets)[number] => !!f)
+    .map((f) => ({ label: f.label, score: f.score }));
 
   return (
     <>
@@ -977,7 +979,7 @@ function ResultsView({
             >
               <span className="text-xs text-white/45">score</span>
             </Ring>
-            <p className="mt-3 text-xl font-bold">{headline}</p>
+            <p className="mt-3 text-xl font-bold tracking-display-tight leading-display">{headline}</p>
             <div className="mt-2 flex flex-wrap justify-center gap-2">
               <span className="rounded-full bg-spotlight/15 px-3 py-1 text-sm font-semibold text-spotlight">
                 +{result.xpEarned} XP
@@ -1048,26 +1050,55 @@ function ResultsView({
             </div>
           )}
 
-          {/* Dimension breakdown */}
+          {/* Radar: delivery-then-content order, independent of the focus-first
+              card order below. Needs at least 3 axes to read as a shape. */}
+          {radarAxes.length >= 3 && (
+            <div className="rounded-2xl bg-white/[0.04] p-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/40">
+                Score breakdown
+              </p>
+              <ScoreRadar axes={radarAxes} />
+            </div>
+          )}
+
+          {/* Facet breakdown — six composite scores instead of the ten raw
+              dimensions, focus facets first (see buildFacets in lib/coach.ts). */}
           <div className="space-y-2.5">
-            {result.scores.map((s) => {
-              const trend = postRecordProgress
-                ? dimensionTrend(postRecordProgress, s.dimension, 7, exercise.id)
-                : [];
+            {result.facets.map((f) => {
+              // A facet always ships with at least one part, but the trend line
+              // must not be the thing that throws on a results screen.
+              const leadPart = f.parts[0];
+              const trend =
+                postRecordProgress && leadPart
+                  ? dimensionTrend(postRecordProgress, leadPart.dimension, 7, exercise.id)
+                  : [];
               const hasTrend = trend.length >= 2;
               const barColor =
-                s.tier === 'green'
+                f.tier === 'green'
                   ? '#3DD68C'
-                  : s.tier === 'amber'
+                  : f.tier === 'amber'
                   ? '#FFB454'
                   : '#FF6B6B';
-              const benchmark = BENCHMARKS[s.dimension as keyof typeof BENCHMARKS];
+              // Skip a part's detail line when it's the only part and its detail
+              // is what the card headline already shows — no point saying it twice.
+              const extraParts =
+                f.parts.length === 1 && leadPart && leadPart.detail === f.detail ? [] : f.parts;
+              // The benchmark ("Target: 125-165 wpm - ...") is per dimension, not
+              // per facet, so showing one for every part would put four lines on a
+              // two-part card and undo the whole point of collapsing to six. Show
+              // it for the weakest measured part only — the one worth acting on.
+              const actionable = f.parts
+                .filter((part) => part.measured)
+                .sort((a, b) => a.score - b.score)[0];
+              const benchmark = actionable
+                ? BENCHMARKS[actionable.dimension as keyof typeof BENCHMARKS]
+                : undefined;
               return (
-                <div key={s.dimension} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
+                <div key={f.facet} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm font-semibold truncate">{s.label}</span>
-                      {s.tier && <TierBadge tier={s.tier} />}
+                      <span className="text-sm font-semibold truncate">{f.label}</span>
+                      <TierBadge tier={f.tier} />
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {hasTrend && (
@@ -1078,8 +1109,8 @@ function ResultsView({
                           color={barColor}
                         />
                       )}
-                      <span className={cn('text-sm font-bold', !s.measured && 'text-white/30')}>
-                        {s.measured ? s.score : '—'}
+                      <span className={cn('text-sm font-bold', !f.measured && 'text-white/30')}>
+                        {f.measured ? f.score : '—'}
                       </span>
                     </div>
                   </div>
@@ -1087,13 +1118,18 @@ function ResultsView({
                     <div
                       className="h-full rounded-full transition-all"
                       style={{
-                        width: `${s.measured ? s.score : 0}%`,
+                        width: `${f.measured ? f.score : 0}%`,
                         backgroundColor: barColor,
                       }}
                     />
                   </div>
-                  <p className="mt-1.5 text-xs text-white/55">{s.detail}</p>
-                  {benchmark && s.measured && (
+                  <p className="mt-1.5 text-xs text-white/55">{f.detail}</p>
+                  {extraParts.map((p) => (
+                    <p key={p.dimension} className="mt-1 text-[11px] text-white/35">
+                      {p.label}: {p.detail}
+                    </p>
+                  ))}
+                  {benchmark && (
                     <p className="mt-1 text-[11px] text-white/30">
                       Target: {benchmark.target} — {benchmark.rationale}
                     </p>
